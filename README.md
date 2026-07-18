@@ -8,7 +8,7 @@ Amazon transactions land in YNAB as an amount and the payee "Amazon" — nothing
 - **Refund attribution.** Refund credits are matched to YNAB inflows. A full-order refund lists the returned items; a partial refund names the single item whose price fits the amount, or falls back to listing the order's items. When the original purchase can be found, its category is noted (`→ was: Electronics`) so you know where to apply the refund.
 - **Per-item splits.** Multi-item charges can be turned into YNAB split transactions — one subtransaction per item at its price, plus a "Tax & shipping" remainder — so each item gets its own category. Splits are only proposed when the charge covers the whole order and every item price parsed; otherwise the transaction stays memo-only.
 
-Everything runs client-side in the extension. Your data goes to exactly two places: amazon.com (your existing login session) and api.ynab.com (your personal access token). No backend, no analytics, no third parties.
+Everything runs client-side in the extension. Your data goes to exactly two places: amazon.com (your existing login session) and api.ynab.com (via OAuth). No backend, no analytics, no third parties.
 
 ## How it works
 
