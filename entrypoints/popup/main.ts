@@ -1,5 +1,12 @@
 import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/amazon';
 import {
+  authorize,
+  disconnect,
+  getAccessToken,
+  isConnected,
+  oauthConfigured,
+} from '@/lib/oauth';
+import {
   getSettings,
   getState,
   saveSettings,
@@ -8,11 +15,15 @@ import {
 } from '@/lib/state';
 import { getBudgets, type YnabBudget } from '@/lib/ynab';
 
+const PRIVACY_URL =
+  'https://github.com/jparavisini/amazon-exporter-for-ynab/blob/main/PRIVACY.md';
+
 const app = document.getElementById('app')!;
 
 let settings: Settings;
 let state: SyncState;
 let budgets: YnabBudget[] = [];
+let ynabConnected = false;
 let amazonGranted = false;
 let budgetError = '';
 
@@ -30,24 +41,52 @@ function el<K extends keyof HTMLElementTagNameMap>(
 async function loadBudgets(): Promise<void> {
   budgetError = '';
   budgets = [];
-  if (!settings.pat) return;
+  const accessToken = await getAccessToken();
+  ynabConnected = accessToken !== null;
+  if (!accessToken) return;
   try {
-    budgets = await getBudgets(settings.pat);
+    budgets = await getBudgets(accessToken);
   } catch {
-    budgetError = 'Could not load budgets. Check the token.';
+    budgetError = 'Could not load budgets. Try reconnecting YNAB.';
   }
 }
 
 function renderSettings(): HTMLElement {
-  const patInput = el('input', {
-    type: 'password',
-    value: settings.pat,
-    placeholder: 'YNAB Personal Access Token',
-  });
-  patInput.addEventListener('change', async () => {
-    settings.pat = patInput.value.trim();
-    await saveSettings(settings);
-    await loadBudgets();
+  if (!ynabConnected) {
+    if (!oauthConfigured()) {
+      return el('section', {}, [
+        el('div', { className: 'status error' }, [
+          'OAuth client ID is not configured. See the README.',
+        ]),
+      ]);
+    }
+    const connectBtn = el('button', {
+      className: 'primary',
+      textContent: 'Connect YNAB',
+    });
+    connectBtn.addEventListener('click', async () => {
+      const token = await authorize(true);
+      if (token) {
+        await loadBudgets();
+      } else {
+        budgetError = 'YNAB authorization failed or was cancelled.';
+      }
+      render();
+    });
+    return el('section', {}, [
+      el('div', {}, ['Authorize read/write access to your YNAB budget.']),
+      connectBtn,
+      ...(budgetError
+        ? [el('div', { className: 'status error' }, [budgetError])]
+        : []),
+    ]);
+  }
+
+  const disconnectBtn = el('button', { textContent: 'Disconnect YNAB' });
+  disconnectBtn.addEventListener('click', async () => {
+    await disconnect();
+    ynabConnected = false;
+    budgets = [];
     render();
   });
 
@@ -113,13 +152,13 @@ function renderSettings(): HTMLElement {
   });
 
   return el('section', {}, [
-    el('label', {}, ['YNAB token', patInput]),
     ...(budgetError ? [el('div', { className: 'status error' }, [budgetError])] : []),
     el('label', {}, ['Budget', budgetSelect]),
     el('div', { className: 'row' }, [
       el('label', {}, ['Orders from', yearSelect]),
       el('label', {}, ['Max orders', limitInput]),
     ]),
+    disconnectBtn,
   ]);
 }
 
@@ -152,7 +191,7 @@ function renderAmazon(): HTMLElement {
 
 function renderSync(): HTMLElement {
   const busy = state.status === 'scanning' || state.status === 'applying';
-  const ready = amazonGranted && !!settings.pat && !!settings.budgetId;
+  const ready = amazonGranted && ynabConnected && !!settings.budgetId;
 
   const scanBtn = el('button', {
     className: 'primary',
@@ -242,12 +281,22 @@ function renderSync(): HTMLElement {
   return el('section', {}, children);
 }
 
+function renderFooter(): HTMLElement {
+  return el('footer', { className: 'muted' }, [
+    el('div', {}, [
+      'We are not affiliated, associated, or in any way officially connected with YNAB or any of its subsidiaries or affiliates.',
+    ]),
+    el('a', { href: PRIVACY_URL, target: '_blank', textContent: 'Privacy policy' }),
+  ]);
+}
+
 function render(): void {
   app.replaceChildren(
-    el('h1', { textContent: 'YNAB Amazon Matcher' }),
+    el('h1', { textContent: 'Amazon Exporter for YNAB' }),
     renderSettings(),
     renderAmazon(),
     renderSync(),
+    renderFooter(),
   );
 }
 
@@ -259,10 +308,11 @@ browser.storage.onChanged.addListener(async (changes, area) => {
 });
 
 (async () => {
-  [settings, state, amazonGranted] = await Promise.all([
+  [settings, state, amazonGranted, ynabConnected] = await Promise.all([
     getSettings(),
     getState(),
     browser.permissions.contains({ origins: AMAZON_ORIGINS }),
+    isConnected(),
   ]);
   render();
   await loadBudgets();

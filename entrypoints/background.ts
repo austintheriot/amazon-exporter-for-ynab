@@ -18,28 +18,34 @@ import {
   setState,
   type Message,
 } from '@/lib/state';
+import { disconnect, getAccessToken } from '@/lib/oauth';
 import {
   getTransactions,
   updateTransactionMemo,
   YnabAuthError,
 } from '@/lib/ynab';
 
+const RECONNECT_MESSAGE = 'YNAB session expired. Reconnect YNAB in the popup.';
+
 function errorMessage(err: unknown): string {
   if (err instanceof AmazonSessionError) {
     return 'Not signed in to Amazon. Open amazon.com, sign in, then scan again.';
   }
   if (err instanceof YnabAuthError) {
-    return 'YNAB rejected the token. Check your Personal Access Token.';
+    return RECONNECT_MESSAGE;
   }
   return err instanceof Error ? err.message : String(err);
 }
 
 async function runScan(): Promise<void> {
   const settings = await getSettings();
-  if (!settings.pat || !settings.budgetId) {
+  const accessToken = await getAccessToken();
+  if (!accessToken || !settings.budgetId) {
     await setState({
       status: 'error',
-      message: 'Set your YNAB token and budget first.',
+      message: accessToken
+        ? 'Pick a budget first.'
+        : 'Connect YNAB in the popup first.',
     });
     return;
   }
@@ -74,7 +80,7 @@ async function runScan(): Promise<void> {
       .toISOString()
       .slice(0, 10);
     const transactions = await getTransactions(
-      settings.pat,
+      accessToken,
       settings.budgetId,
       ynabSince,
     );
@@ -166,12 +172,18 @@ async function runScan(): Promise<void> {
       lastScanAt: new Date().toISOString(),
     });
   } catch (err) {
+    if (err instanceof YnabAuthError) await disconnect();
     await setState({ status: 'error', message: errorMessage(err) });
   }
 }
 
 async function runApply(txnIds: string[]): Promise<void> {
   const settings = await getSettings();
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    await setState({ status: 'error', message: RECONNECT_MESSAGE });
+    return;
+  }
   const state = await getState();
   const toApply = state.proposals.filter((p) => txnIds.includes(p.txnId));
 
@@ -182,7 +194,7 @@ async function runApply(txnIds: string[]): Promise<void> {
   for (const proposal of toApply) {
     try {
       await updateTransactionMemo(
-        settings.pat,
+        accessToken,
         settings.budgetId,
         proposal.txnId,
         proposal.memo,

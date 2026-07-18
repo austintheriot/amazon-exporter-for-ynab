@@ -15,7 +15,6 @@ export interface ScanDebug {
 }
 
 export interface Settings {
-  pat: string;
   budgetId: string;
   budgetName: string;
   year: number | null; // null = recent orders (no year filter)
@@ -37,7 +36,6 @@ export interface SyncState {
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  pat: '',
   budgetId: '',
   budgetName: '',
   year: null,

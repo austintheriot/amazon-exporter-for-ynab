@@ -28,14 +28,14 @@ export interface YnabSplit {
 }
 
 async function request<T>(
-  pat: string,
+  accessToken: string,
   path: string,
   init?: RequestInit,
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${pat}`,
+      Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       ...init?.headers,
     },
@@ -50,31 +50,31 @@ async function request<T>(
   return body.data;
 }
 
-export async function getBudgets(pat: string): Promise<YnabBudget[]> {
-  const data = await request<{ budgets: YnabBudget[] }>(pat, '/budgets');
+export async function getBudgets(accessToken: string): Promise<YnabBudget[]> {
+  const data = await request<{ budgets: YnabBudget[] }>(accessToken, '/budgets');
   return data.budgets.map(({ id, name }) => ({ id, name }));
 }
 
 export async function getTransactions(
-  pat: string,
+  accessToken: string,
   budgetId: string,
   sinceDate: string,
 ): Promise<YnabTransaction[]> {
   const data = await request<{ transactions: YnabTransaction[] }>(
-    pat,
+    accessToken,
     `/budgets/${budgetId}/transactions?since_date=${sinceDate}`,
   );
   return data.transactions;
 }
 
 export async function updateTransactionMemo(
-  pat: string,
+  accessToken: string,
   budgetId: string,
   transactionId: string,
   memo: string,
   splits?: YnabSplit[],
 ): Promise<void> {
-  await request(pat, `/budgets/${budgetId}/transactions/${transactionId}`, {
+  await request(accessToken, `/budgets/${budgetId}/transactions/${transactionId}`, {
     method: 'PUT',
     body: JSON.stringify({
       transaction: splits?.length ? { memo, subtransactions: splits } : { memo },

@@ -1,4 +1,4 @@
-# YNAB Amazon Exporter
+# Amazon Exporter for YNAB
 
 Chrome extension that matches your Amazon order history to your [YNAB](https://www.ynab.com/) transactions and enriches them with what you actually bought.
 
@@ -32,10 +32,19 @@ Then open `chrome://extensions`, enable Developer mode, click "Load unpacked", a
 
 In the popup:
 
-1. Paste a YNAB Personal Access Token (YNAB → Account Settings → Developer Settings). It is stored in the extension's local browser storage and sent only to api.ynab.com.
+1. Click "Connect YNAB" and authorize the extension (OAuth; the short-lived access token is stored in the extension's local browser storage and sent only to api.ynab.com).
 2. Pick your budget.
 3. Click "Connect Amazon" to grant the host permission, and make sure you're signed in to amazon.com.
 4. "Scan (dry run)", review the proposed memos and splits, then "Apply".
+
+### OAuth client (maintainers and forks)
+
+The extension authenticates with YNAB via the OAuth implicit grant, so it needs a registered OAuth application:
+
+1. Register one at YNAB → Account Settings → Developer Settings → New OAuth Application, with redirect URI `https://obinghobhinimagmkihogflcieggmcgk.chromiumapp.org/`. That URI is stable because the extension ID is pinned by the `key` in `wxt.config.ts` — every unpacked install shares it.
+2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
+
+If you fork and change the manifest `key`, your extension ID — and therefore the redirect URI you must register — changes with it. New YNAB OAuth applications start in restricted mode (25 users); see the [YNAB API docs](https://api.ynab.com/) for the review process.
 
 ## Development
 
@@ -46,9 +55,13 @@ In the popup:
 
 The fragile piece is `parseInvoice` in `lib/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors/regexes there; the smoke test fixtures in `scripts/smoke.ts` are the place to pin the behavior.
 
+## Privacy
+
+Fully client-side: no backend, no analytics, no third parties. See [PRIVACY.md](PRIVACY.md).
+
 ## Disclaimer
 
-Not affiliated with, endorsed by, or supported by YNAB or Amazon. It automates reading pages from your own Amazon account; Amazon's markup can change at any time and break parsing. Review proposals before applying — writes are limited to transaction memos and splits, but they are your budget's data.
+We are not affiliated, associated, or in any way officially connected with YNAB or any of its subsidiaries or affiliates. Nor with Amazon. The extension automates reading pages from your own Amazon account; Amazon's markup can change at any time and break parsing. Review proposals before applying — writes are limited to transaction memos and splits, but they are your budget's data.
 
 ## License
 
