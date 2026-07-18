@@ -1,0 +1,55 @@
+# YNAB Amazon Exporter
+
+Chrome extension that matches your Amazon order history to your [YNAB](https://www.ynab.com/) transactions and enriches them with what you actually bought.
+
+Amazon transactions land in YNAB as an amount and the payee "Amazon" — nothing else. This extension fills the gap:
+
+- **Item-name memos.** Each matched charge gets a memo listing the order's items, with the Amazon order ID appended for easy lookup (`Echo Dot (5th Gen) [111-1234567-7654321]`).
+- **Refund attribution.** Refund credits are matched to YNAB inflows. A full-order refund lists the returned items; a partial refund names the single item whose price fits the amount, or falls back to listing the order's items. When the original purchase can be found, its category is noted (`→ was: Electronics`) so you know where to apply the refund.
+- **Per-item splits.** Multi-item charges can be turned into YNAB split transactions — one subtransaction per item at its price, plus a "Tax & shipping" remainder — so each item gets its own category. Splits are only proposed when the charge covers the whole order and every item price parsed; otherwise the transaction stays memo-only.
+
+Everything runs client-side in the extension. Your data goes to exactly two places: amazon.com (your existing login session) and api.ynab.com (your personal access token). No backend, no analytics, no third parties.
+
+## How it works
+
+1. Fetches `amazon.com/cpe/yourpayments/transactions` in the background service worker using your existing Amazon login cookies, paginating via the page's widget-form POST. Each entry is an actual card charge or refund credit (one per shipment, so split shipments match correctly) with its order ID.
+2. Fetches YNAB transactions over the same period (plus a 60-day lookback so refunds can find their original purchase) and matches each charge to an outflow — and each credit to an inflow — with the exact same amount, an Amazon-ish payee, an empty memo, and a date within -1 to +7 days. Digital orders are skipped.
+3. For matched orders, fetches the order details page and parses item names and prices with cheerio (handles both the modern data-component page and the legacy print invoice). Unparseable pages are skipped rather than guessed at, and their raw HTML is exportable from the popup for debugging.
+4. Scanning is a dry run: proposals show in the popup and nothing is written until you click Apply. Applied transaction IDs are remembered so re-scans don't re-apply.
+
+## Install
+
+There's no store listing; you load it unpacked:
+
+```bash
+npm install
+npm run build
+```
+
+Then open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select `.output/chrome-mv3`.
+
+## Setup
+
+In the popup:
+
+1. Paste a YNAB Personal Access Token (YNAB → Account Settings → Developer Settings). It is stored in the extension's local browser storage and sent only to api.ynab.com.
+2. Pick your budget.
+3. Click "Connect Amazon" to grant the host permission, and make sure you're signed in to amazon.com.
+4. "Scan (dry run)", review the proposed memos and splits, then "Apply".
+
+## Development
+
+- `npm run dev` — WXT dev mode with reload
+- `npm run smoke` — parser/matcher tests against synthetic fixtures
+- `npm run typecheck` — TypeScript, strict mode
+- `npx tsx scripts/parse-captures.ts <debug.json>` — run the invoice parser against real captured pages from the popup's debug export
+
+The fragile piece is `parseInvoice` in `lib/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors/regexes there; the smoke test fixtures in `scripts/smoke.ts` are the place to pin the behavior.
+
+## Disclaimer
+
+Not affiliated with, endorsed by, or supported by YNAB or Amazon. It automates reading pages from your own Amazon account; Amazon's markup can change at any time and break parsing. Review proposals before applying — writes are limited to transaction memos and splits, but they are your budget's data.
+
+## License
+
+[MIT](LICENSE)

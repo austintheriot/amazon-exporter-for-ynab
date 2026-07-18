@@ -1,0 +1,29 @@
+{
+  "name": "ynab-amazon-exporter",
+  "version": "0.1.0",
+  "description": "Chrome extension that matches Amazon order history to YNAB transactions: item-name memos, refund attribution, and per-item splits.",
+  "private": true,
+  "license": "MIT",
+  "author": "Joe Paravisini",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jparavisini/ynab-amazon-exporter.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "smoke": "tsx scripts/smoke.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "wxt": "^0.20.0"
+  }
+}

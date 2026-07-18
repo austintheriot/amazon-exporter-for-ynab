@@ -1,0 +1,270 @@
+import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/amazon';
+import {
+  getSettings,
+  getState,
+  saveSettings,
+  type Settings,
+  type SyncState,
+} from '@/lib/state';
+import { getBudgets, type YnabBudget } from '@/lib/ynab';
+
+const app = document.getElementById('app')!;
+
+let settings: Settings;
+let state: SyncState;
+let budgets: YnabBudget[] = [];
+let amazonGranted = false;
+let budgetError = '';
+
+function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> & { className?: string } = {},
+  children: (Node | string)[] = [],
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  node.append(...children);
+  return node;
+}
+
+async function loadBudgets(): Promise<void> {
+  budgetError = '';
+  budgets = [];
+  if (!settings.pat) return;
+  try {
+    budgets = await getBudgets(settings.pat);
+  } catch {
+    budgetError = 'Could not load budgets. Check the token.';
+  }
+}
+
+function renderSettings(): HTMLElement {
+  const patInput = el('input', {
+    type: 'password',
+    value: settings.pat,
+    placeholder: 'YNAB Personal Access Token',
+  });
+  patInput.addEventListener('change', async () => {
+    settings.pat = patInput.value.trim();
+    await saveSettings(settings);
+    await loadBudgets();
+    render();
+  });
+
+  const budgetSelect = el('select');
+  budgetSelect.append(el('option', { value: '', textContent: 'Select budget…' }));
+  for (const b of budgets) {
+    budgetSelect.append(
+      el('option', {
+        value: b.id,
+        textContent: b.name,
+        selected: b.id === settings.budgetId,
+      }),
+    );
+  }
+  if (settings.budgetId && !budgets.some((b) => b.id === settings.budgetId)) {
+    budgetSelect.append(
+      el('option', {
+        value: settings.budgetId,
+        textContent: settings.budgetName || settings.budgetId,
+        selected: true,
+      }),
+    );
+  }
+  budgetSelect.addEventListener('change', async () => {
+    settings.budgetId = budgetSelect.value;
+    settings.budgetName =
+      budgets.find((b) => b.id === budgetSelect.value)?.name ?? '';
+    await saveSettings(settings);
+    render();
+  });
+
+  const currentYear = new Date().getFullYear();
+  const yearSelect = el('select');
+  yearSelect.append(
+    el('option', { value: '', textContent: 'Recent orders', selected: settings.year === null }),
+  );
+  for (let y = currentYear; y >= currentYear - 4; y--) {
+    yearSelect.append(
+      el('option', {
+        value: String(y),
+        textContent: String(y),
+        selected: settings.year === y,
+      }),
+    );
+  }
+  yearSelect.addEventListener('change', async () => {
+    settings.year = yearSelect.value ? Number(yearSelect.value) : null;
+    await saveSettings(settings);
+  });
+
+  const limitInput = el('input', {
+    type: 'number',
+    min: '1',
+    max: '200',
+    value: String(settings.orderLimit),
+  });
+  limitInput.addEventListener('change', async () => {
+    const n = parseInt(limitInput.value, 10);
+    if (Number.isFinite(n) && n > 0) {
+      settings.orderLimit = Math.min(n, 200);
+      await saveSettings(settings);
+    }
+  });
+
+  return el('section', {}, [
+    el('label', {}, ['YNAB token', patInput]),
+    ...(budgetError ? [el('div', { className: 'status error' }, [budgetError])] : []),
+    el('label', {}, ['Budget', budgetSelect]),
+    el('div', { className: 'row' }, [
+      el('label', {}, ['Orders from', yearSelect]),
+      el('label', {}, ['Max orders', limitInput]),
+    ]),
+  ]);
+}
+
+function renderAmazon(): HTMLElement {
+  if (amazonGranted) {
+    return el('section', {}, [
+      el('div', {}, [
+        'Amazon access granted. ',
+        el('span', { className: 'muted' }, [
+          'Stay signed in to amazon.com in this browser.',
+        ]),
+      ]),
+    ]);
+  }
+  const connectBtn = el('button', { className: 'primary', textContent: 'Connect Amazon' });
+  connectBtn.addEventListener('click', async () => {
+    amazonGranted = await browser.permissions.request({
+      origins: AMAZON_ORIGINS,
+    });
+    if (amazonGranted) {
+      await browser.tabs.create({ url: AMAZON_LOGIN_URL });
+    }
+    render();
+  });
+  return el('section', {}, [
+    el('div', {}, ['Grant access to read your Amazon order history.']),
+    connectBtn,
+  ]);
+}
+
+function renderSync(): HTMLElement {
+  const busy = state.status === 'scanning' || state.status === 'applying';
+  const ready = amazonGranted && !!settings.pat && !!settings.budgetId;
+
+  const scanBtn = el('button', {
+    className: 'primary',
+    textContent: busy ? 'Working…' : 'Scan (dry run)',
+    disabled: busy || !ready,
+  });
+  scanBtn.addEventListener('click', () => {
+    void browser.runtime.sendMessage({ type: 'scan' });
+  });
+
+  const pending = state.proposals.filter(
+    (p) => !state.appliedTxnIds.includes(p.txnId),
+  );
+  const applyBtn = el('button', {
+    textContent: `Apply ${pending.length} memo${pending.length === 1 ? '' : 's'} to YNAB`,
+    disabled: busy || pending.length === 0,
+  });
+  applyBtn.addEventListener('click', () => {
+    void browser.runtime.sendMessage({
+      type: 'apply',
+      txnIds: pending.map((p) => p.txnId),
+    });
+  });
+
+  const children: (Node | string)[] = [
+    el('div', { className: 'row' }, [scanBtn, applyBtn]),
+  ];
+
+  if (state.message) {
+    children.push(
+      el('div', {
+        className: `status${state.status === 'error' ? ' error' : ''}`,
+        textContent: state.message,
+      }),
+    );
+  }
+
+  if (state.counts) {
+    const { charges, credits, digitalSkipped, invoicesUnparsed } = state.counts;
+    const parts = [`${charges} card charges found`];
+    if (credits) parts.push(`${credits} refunds found`);
+    if (digitalSkipped) parts.push(`${digitalSkipped} digital orders skipped`);
+    if (invoicesUnparsed)
+      parts.push(`${invoicesUnparsed} invoices could not be parsed`);
+    children.push(el('div', { className: 'muted' }, [parts.join(' · ')]));
+  }
+
+  if (state.debugCaptures.length > 0 || state.scanDebug) {
+    const exportBtn = el('button', {
+      textContent: 'Export scan debug data',
+    });
+    exportBtn.addEventListener('click', () => {
+      const payload = {
+        captures: state.debugCaptures,
+        scanDebug: state.scanDebug,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'ynab-amazon-debug.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    children.push(exportBtn);
+  }
+
+  if (state.proposals.length > 0) {
+    const list = el('ul', { className: 'proposals' });
+    for (const p of state.proposals) {
+      const applied = state.appliedTxnIds.includes(p.txnId);
+      list.append(
+        el('li', { className: applied ? 'applied' : '' }, [
+          el('div', { className: 'proposal-body' }, [
+            el('div', { className: 'proposal-title' }, [
+              `$${p.orderTotal.toFixed(2)} · ${p.kind === 'refund' ? 'refunded' : 'charged'} ${p.orderDate} → txn ${p.txnDate}${p.splits ? ` · split ×${p.splits.length}` : ''}${applied ? ' · applied ✓' : ''}`,
+            ]),
+            el('div', { className: 'proposal-memo' }, [p.memo]),
+          ]),
+        ]),
+      );
+    }
+    children.push(list);
+  }
+
+  return el('section', {}, children);
+}
+
+function render(): void {
+  app.replaceChildren(
+    el('h1', { textContent: 'YNAB Amazon Matcher' }),
+    renderSettings(),
+    renderAmazon(),
+    renderSync(),
+  );
+}
+
+browser.storage.onChanged.addListener(async (changes, area) => {
+  if (area === 'local' && changes.syncState) {
+    state = await getState();
+    render();
+  }
+});
+
+(async () => {
+  [settings, state, amazonGranted] = await Promise.all([
+    getSettings(),
+    getState(),
+    browser.permissions.contains({ origins: AMAZON_ORIGINS }),
+  ]);
+  render();
+  await loadBudgets();
+  render();
+})();
