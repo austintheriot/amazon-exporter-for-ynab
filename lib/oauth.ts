@@ -7,7 +7,7 @@
  * The registered redirect URI must match oauthRedirectUri(), which is stable
  * because the extension ID is pinned via the manifest `key`. */
 export const YNAB_OAUTH_CLIENT_ID =
-  'REPLACE_WITH_YNAB_OAUTH_CLIENT_ID';
+  'FVvJ6kFZO-Dt-Tg3byToriLOkCWtfTqjQo5w8PnoJpU';
 
 const AUTHORIZE_URL = 'https://app.ynab.com/oauth/authorize';
 const TOKEN_KEY = 'oauthToken';
