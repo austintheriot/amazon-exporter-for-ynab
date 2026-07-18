@@ -46,4 +46,9 @@ Enrich the user's YNAB transactions with details from the user's own Amazon orde
 3. Note the store-assigned extension ID and add `https://<store-extension-id>.chromiumapp.org/` as a second redirect URI on the YNAB OAuth application (app.ynab.com → Account Settings → Developer Settings).
 4. Request YNAB app review to lift the 25-user restricted mode before promoting the listing.
 
-Assets still needed: 128×128 icon, at least one 1280×800 screenshot of the popup.
+## Status (2026-07-18)
+
+- v0.1.0 submitted for review. Store extension ID: `gnphifadcnipkgcbfohpcmajahpliilf`.
+- Both redirect URIs (unpacked `obingho…` and store `gnphif…`) are registered on the YNAB OAuth application.
+- Store icon is `public/icon/128.png`; screenshot was the popup padded to 1280×800.
+- Outstanding: YNAB app review to lift the 25-user restricted mode (step 4).
