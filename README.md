@@ -19,14 +19,18 @@ Everything runs client-side in the extension. Your data goes to exactly two plac
 
 ## Install
 
-There's no store listing; you load it unpacked:
+**From a release (no build tools needed):** download the latest `-chrome.zip` from the [Releases page](https://github.com/jparavisini/amazon-exporter-for-ynab/releases), unzip it, open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select the unzipped folder.
+
+**From source:**
 
 ```bash
 npm install
 npm run build
 ```
 
-Then open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select `.output/chrome-mv3`.
+Then load `.output/chrome-mv3` unpacked the same way.
+
+A Chrome Web Store listing is in progress; once live, that becomes the recommended install.
 
 ## Setup
 
@@ -45,6 +49,10 @@ The extension authenticates with YNAB via the OAuth implicit grant, so it needs 
 2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
 
 If you fork and change the manifest `key`, your extension ID — and therefore the redirect URI you must register — changes with it. New YNAB OAuth applications start in restricted mode (25 users); see the [YNAB API docs](https://api.ynab.com/) for the review process.
+
+**Chrome Web Store builds:** `npm run zip:store` builds a zip without the manifest `key` — the store rejects manifests that contain one and assigns its own extension ID. After the first store upload, add that ID's redirect URI (`https://<store-extension-id>.chromiumapp.org/`) to the YNAB OAuth application alongside the unpacked one. Store listing copy and permission justifications live in [docs/store-listing.md](docs/store-listing.md).
+
+**Releases:** pushing a `v*` tag builds the zip in CI and attaches it to a GitHub Release.
 
 ## Development
 
