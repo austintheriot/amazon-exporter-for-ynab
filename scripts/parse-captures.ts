@@ -5,7 +5,7 @@ import { parseInvoice } from '../lib/amazon';
 
 const file = process.argv[2];
 if (!file) {
-  console.error('usage: tsx scripts/parse-captures.ts <debug.json>');
+  console.error('usage: bun scripts/parse-captures.ts <debug.json>');
   process.exit(1);
 }
 
