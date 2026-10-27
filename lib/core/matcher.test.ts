@@ -5,6 +5,7 @@ import {
   buildRefundMemo,
   buildSplits,
   findOriginalTransaction,
+  isAmazonPayee,
   matchCharges,
   matchRefunds,
 } from './matcher';
@@ -324,5 +325,20 @@ describe('matcher behavior pins', () => {
     expect(buildRefundMemo(refundOrder, 56.01, null)).toBe(
       'Partial refund of $67.39 order: Echo Dot (5th Gen) Smart Speaker, Anker USB-C Cable 6ft (2-pack) [111-5555555-5555555]',
     );
+  });
+});
+
+describe('isAmazonPayee', () => {
+  it.each(['Amazon.com', 'AMZN Mktp US', 'amazon prime*AB12', 'Www.amzn.com/bill'])(
+    'accepts %s',
+    (name) => {
+      expect(isAmazonPayee(name)).toBe(true);
+    },
+  );
+  it.each([null, undefined, '', 'Costco', 'Amaz on'])('rejects %s', (name) => {
+    expect(isAmazonPayee(name)).toBe(false);
+  });
+  it('gives the same answer on repeated calls', () => {
+    expect([1, 2, 3].map(() => isAmazonPayee('Amazon'))).toEqual([true, true, true]);
   });
 });

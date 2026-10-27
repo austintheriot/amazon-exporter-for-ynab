@@ -10,6 +10,10 @@ const AMAZON_PAYEE_PATTERN = /amazon|amzn/i;
 /** Max sales tax assumed when attributing a partial refund to one item */
 const MAX_TAX_RATE = 0.12;
 
+export function isAmazonPayee(name: string | null | undefined): boolean {
+  return AMAZON_PAYEE_PATTERN.test(name ?? '');
+}
+
 export interface MatchProposal {
   kind: 'charge' | 'refund';
   orderId: string;
@@ -123,7 +127,7 @@ function matchByAmount(
   const candidates = transactions.filter(
     (t) =>
       Math.sign(t.amount) === sign &&
-      AMAZON_PAYEE_PATTERN.test(t.payee_name ?? '') &&
+      isAmazonPayee(t.payee_name) &&
       !t.memo?.trim(),
   );
 
@@ -188,7 +192,7 @@ export function findOriginalTransaction(
   const byAmount = outflows
     .filter((t) => {
       if (t.amount !== wantAmount) return false;
-      if (!AMAZON_PAYEE_PATTERN.test(t.payee_name ?? '')) return false;
+      if (!isAmazonPayee(t.payee_name)) return false;
       const diff = daysBetween(order.date, t.date);
       return diff >= -1 && diff <= maxDaysAfterCharge;
     })

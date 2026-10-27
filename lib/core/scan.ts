@@ -4,6 +4,7 @@ import {
   buildRefundMemo,
   buildSplits,
   findOriginalTransaction,
+  isAmazonPayee,
   matchCharges,
   matchRefunds,
   type ChargeMatch,
@@ -17,7 +18,6 @@ export const YNAB_LOOKBACK_DAYS = 60;
 export const MAX_DEBUG_CAPTURES = 3;
 
 const DAY_MS = 86_400_000;
-const AMAZON_PAYEE_PATTERN = /amazon|amzn/i;
 const DIGITAL_ORDER_PREFIX = 'D0';
 
 function daysBefore(date: string, days: number): string {
@@ -62,7 +62,7 @@ export function matchScan(input: {
     charges,
     credits,
     candidates: transactions
-      .filter((transaction) => AMAZON_PAYEE_PATTERN.test(transaction.payee_name ?? ''))
+      .filter((transaction) => isAmazonPayee(transaction.payee_name))
       .map((transaction) => ({
         id: transaction.id,
         date: transaction.date,
