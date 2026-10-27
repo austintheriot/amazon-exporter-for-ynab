@@ -126,6 +126,7 @@ export function parseSyncState(raw: unknown): SyncState {
 
 const messageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('scan') }),
+  z.object({ type: z.literal('reset') }),
   z.object({ type: z.literal('apply'), txnIds: z.array(z.string()) }),
 ]);
 

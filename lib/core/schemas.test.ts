@@ -314,6 +314,10 @@ describe('parseMessage', () => {
     });
   });
 
+  it('accepts a reset message', () => {
+    expect(parseMessage({ type: 'reset' })).toEqual({ type: 'reset' });
+  });
+
   it('is null for an unknown type', () => {
     expect(parseMessage({ type: 'nope' })).toBeNull();
   });

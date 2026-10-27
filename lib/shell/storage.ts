@@ -1,4 +1,5 @@
 import {
+  DEFAULT_STATE,
   parseSettings,
   parseSyncState,
   type Settings,
@@ -26,4 +27,20 @@ export async function setState(patch: Partial<SyncState>): Promise<SyncState> {
   const next = { ...(await getState()), ...patch };
   await browser.storage.local.set({ [STATE_KEY]: next });
   return next;
+}
+
+export async function resetState(): Promise<void> {
+  await browser.storage.local.set({ [STATE_KEY]: DEFAULT_STATE });
+}
+
+/** Rechecks after the read: a reset that lands while the read is pending
+ * must not be overwritten by a cancelled run's stale snapshot. */
+export async function setStateIfCurrent(
+  isCurrent: () => boolean,
+  patch: Partial<SyncState>,
+): Promise<void> {
+  if (!isCurrent()) return;
+  const stored = await getState();
+  if (!isCurrent()) return;
+  await browser.storage.local.set({ [STATE_KEY]: { ...stored, ...patch } });
 }

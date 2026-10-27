@@ -5,14 +5,25 @@ import {
   RECONNECT_MESSAGE,
   YnabAuthError,
 } from '@/lib/core/errors';
+import { createRunGuard } from '@/lib/core/run-guard';
 import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
-import { parseMessage } from '@/lib/core/state';
+import { parseMessage, type SyncState } from '@/lib/core/state';
 import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
 import { disconnect, getAccessToken } from '@/lib/shell/oauth';
-import { getSettings, getState, setState } from '@/lib/shell/storage';
+import { getSettings, getState, resetState, setStateIfCurrent } from '@/lib/shell/storage';
 import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
+const runGuard = createRunGuard();
+
+function startRun() {
+  const run = runGuard.start();
+  const isCurrent = () => runGuard.isCurrent(run);
+  const setState = (patch: Partial<SyncState>) => setStateIfCurrent(isCurrent, patch);
+  return { isCurrent, setState };
+}
+
 async function runScan(): Promise<void> {
+  const { setState } = startRun();
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken || !settings.budgetId) {
@@ -71,6 +82,7 @@ async function runScan(): Promise<void> {
 }
 
 async function runApply(txnIds: string[]): Promise<void> {
+  const { isCurrent, setState } = startRun();
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken) {
@@ -85,6 +97,7 @@ async function runApply(txnIds: string[]): Promise<void> {
   let failures = 0;
 
   for (const proposal of toApply) {
+    if (!isCurrent()) return;
     try {
       await updateTransactionMemo(
         accessToken,
@@ -114,6 +127,10 @@ export default defineBackground(() => {
         break;
       case 'apply':
         void runApply(message.txnIds);
+        break;
+      case 'reset':
+        runGuard.cancelAll();
+        void resetState();
         break;
     }
     return false;

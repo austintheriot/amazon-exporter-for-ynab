@@ -224,8 +224,16 @@ function renderSync(): HTMLElement {
     });
   });
 
+  const resetBtn = el('button', {
+    textContent: 'Reset',
+    title: 'Clear scan results and stop a scan or apply in progress. Settings and the YNAB connection stay.',
+  });
+  resetBtn.addEventListener('click', () => {
+    void browser.runtime.sendMessage({ type: 'reset' });
+  });
+
   const children: (Node | string)[] = [
-    el('div', { className: 'row' }, [scanBtn, applyBtn]),
+    el('div', { className: 'row' }, [scanBtn, applyBtn, resetBtn]),
   ];
 
   if (state.message) {
