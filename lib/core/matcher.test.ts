@@ -228,3 +228,101 @@ describe('buildSplits', () => {
     ).toBeNull();
   });
 });
+
+describe('matcher behavior pins', () => {
+  const amazon = 'Amazon.com';
+
+  it('matches a transaction 1 day before the charge but not 2 days before', () => {
+    const entry = charge('P', '2026-06-12', 10);
+    expect(
+      matchCharges([entry], [txn('early1', '2026-06-11', -10000, amazon)]),
+    ).toHaveLength(1);
+    expect(
+      matchCharges([entry], [txn('early2', '2026-06-10', -10000, amazon)]),
+    ).toHaveLength(0);
+  });
+
+  it('with maxDays 7, matches at +7 days and not at +8', () => {
+    const entry = charge('P', '2026-06-12', 10);
+    expect(
+      matchCharges([entry], [txn('late7', '2026-06-19', -10000, amazon)], 7),
+    ).toHaveLength(1);
+    expect(
+      matchCharges([entry], [txn('late8', '2026-06-20', -10000, amazon)], 7),
+    ).toHaveLength(0);
+  });
+
+  it('defaults maxDays to 7 when the argument is omitted', () => {
+    const entry = charge('P', '2026-06-12', 10);
+    expect(
+      matchCharges([entry], [txn('late7', '2026-06-19', -10000, amazon)]),
+    ).toHaveLength(1);
+    expect(
+      matchCharges([entry], [txn('late8', '2026-06-20', -10000, amazon)]),
+    ).toHaveLength(0);
+  });
+
+  it('picks the nearer of two qualifying transactions when the farther is listed first', () => {
+    const matches = matchCharges(
+      [charge('P', '2026-06-12', 10)],
+      [
+        txn('far', '2026-06-17', -10000, amazon),
+        txn('near', '2026-06-13', -10000, amazon),
+      ],
+    );
+    expect(matches.map((match) => match.txn.id)).toEqual(['near']);
+  });
+
+  it('skips a sole candidate with a non-blank memo', () => {
+    expect(
+      matchCharges(
+        [charge('P', '2026-06-12', 10)],
+        [txn('memo', '2026-06-13', -10000, amazon, 'x')],
+      ),
+    ).toHaveLength(0);
+  });
+
+  it('converts a float-unsafe dollar amount to exact milliunits', () => {
+    expect(2.01 * 1000).not.toBe(2010);
+    const matches = matchCharges(
+      [charge('P', '2026-06-12', 2.01)],
+      [txn('exact', '2026-06-12', -2010, amazon)],
+    );
+    expect(matches.map((match) => match.txn.id)).toEqual(['exact']);
+  });
+
+  it('findOriginalTransaction prefers an order-ID memo at +6 days over an amount match at +0', () => {
+    const original = findOriginalTransaction(refundOrder, [
+      txn('amountOnly', '2026-06-10', -67390, amazon),
+      txn('byMemo', '2026-06-16', -67390, amazon, `stuff [${refundOrder.id}]`),
+    ]);
+    expect(original?.id).toBe('byMemo');
+  });
+
+  it('truncates an over-long memo to exactly 480 characters with an ellipsis before the order ID', () => {
+    const orderId = '111-1234567-7654321';
+    const suffix = ` [${orderId}]`;
+    const body = 'a'.repeat(600);
+    const memo = buildMemo([body], orderId);
+    expect(memo).toHaveLength(480);
+    expect(memo).toBe(`${'a'.repeat(480 - suffix.length - 1)}… [${orderId}]`);
+  });
+
+  it('keeps a memo body that exactly fills the limit untruncated', () => {
+    const orderId = '111-1234567-7654321';
+    const body = 'b'.repeat(480 - ` [${orderId}]`.length);
+    expect(buildMemo([body], orderId)).toBe(`${body} [${orderId}]`);
+  });
+
+  it('names a refunded item when the amount is inside the price-plus-12%-plus-2-cents band', () => {
+    expect(buildRefundMemo(refundOrder, 56.0, null)).toBe(
+      'Refund: Echo Dot (5th Gen) Smart Speaker [111-5555555-5555555]',
+    );
+  });
+
+  it('falls back to the item list when the amount is 1 cent above the band', () => {
+    expect(buildRefundMemo(refundOrder, 56.01, null)).toBe(
+      'Partial refund of $67.39 order: Echo Dot (5th Gen) Smart Speaker, Anker USB-C Cable 6ft (2-pack) [111-5555555-5555555]',
+    );
+  });
+});

@@ -19,6 +19,7 @@ import { dollarsToOutflowMilliunits, type YnabTransaction } from './ynab';
 
 const DAY_MS = 86_400_000;
 const MEMO_MAX_LENGTH = 480;
+const SPEC_AMAZON_PAYEE = /amazon|amzn/i;
 
 const daysBetween = (from: string, to: string): number =>
   (new Date(to).getTime() - new Date(from).getTime()) / DAY_MS;
@@ -94,6 +95,30 @@ describe.each(matchers)('$name properties', ({ match, sign }) => {
         const diff = daysBetween(found.charge.date, found.txn.date);
         expect(diff).toBeGreaterThanOrEqual(-1);
         expect(diff).toBeLessThanOrEqual(maxDays);
+      }
+    },
+  );
+
+  it.prop([scenarioArb])(
+    'leaves no unmatched entry with an unclaimed qualifying transaction',
+    ({ charges, transactions, maxDays }) => {
+      const found = match(charges, transactions, maxDays);
+      const claimedIds = new Set(found.map((pair) => pair.txn.id));
+      const matchedEntries = new Set(found.map((pair) => pair.charge));
+      for (const entry of charges) {
+        if (matchedEntries.has(entry)) continue;
+        const leftover = transactions.filter((transaction) => {
+          const diff = daysBetween(entry.date, transaction.date);
+          return (
+            !claimedIds.has(transaction.id) &&
+            transaction.amount === sign * Math.round(entry.amount * 1000) &&
+            SPEC_AMAZON_PAYEE.test(transaction.payee_name ?? '') &&
+            (transaction.memo ?? '').trim() === '' &&
+            diff >= -1 &&
+            diff <= maxDays
+          );
+        });
+        expect(leftover).toEqual([]);
       }
     },
   );
