@@ -315,7 +315,7 @@ describe('runScan debug captures', () => {
       invoices: Object.fromEntries(
         orderIds.map((orderId, index) => [
           orderId,
-          index === 0 ? hugeSorryPage : unparseableInvoiceHtml,
+          index === 4 ? hugeSorryPage : unparseableInvoiceHtml,
         ]),
       ),
       ynab: {
@@ -343,6 +343,7 @@ describe('runScan debug captures', () => {
       orderIds[3],
       orderIds[2],
     ]);
+    expect(state.debugCaptures[0]?.html.length).toBe(500_000);
     for (const capture of state.debugCaptures) {
       expect(capture.html.length).toBeLessThanOrEqual(500_000);
     }
