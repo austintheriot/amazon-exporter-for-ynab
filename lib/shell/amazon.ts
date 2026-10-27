@@ -14,7 +14,7 @@ import {
   type DebugCapture,
 } from '../core/amazon';
 import { AmazonSessionError } from '../core/errors';
-import { decideAfterPage, finalizeCharges } from '../core/paging';
+import { decideAfterPage, finalizeCharges, oldestDate } from '../core/paging';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const DETAIL_CONCURRENCY = 4;
@@ -90,12 +90,11 @@ export async function fetchAmazonCharges({
     }
 
     const parsed = parseTransactionsPage($);
-    const pageDates = [...parsed.charges, ...parsed.credits].map((item) => item.date);
     const decision = decideAfterPage({
       page,
       pageCharges: parsed.charges.length,
       pageCredits: parsed.credits.length,
-      oldestDateOnPage: pageDates.length === 0 ? null : pageDates.reduce(minDate),
+      oldestDateOnPage: oldestDate([...parsed.charges, ...parsed.credits]),
       chargesSoFar: all.length + parsed.charges.length,
       sinceDate,
       limit,
@@ -125,8 +124,6 @@ export async function fetchAmazonCharges({
   });
   return { charges, credits, captures };
 }
-
-const minDate = (left: string, right: string) => (right < left ? right : left);
 
 // --- Order invoice (item names for the memo) ---
 

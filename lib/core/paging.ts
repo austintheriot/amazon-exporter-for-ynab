@@ -44,3 +44,11 @@ export function finalizeCharges(
     credits: credits.filter(inWindow),
   };
 }
+
+export function oldestDate(entries: AmazonCharge[]): string | null {
+  let oldest: string | null = null;
+  for (const entry of entries) {
+    if (oldest === null || entry.date < oldest) oldest = entry.date;
+  }
+  return oldest;
+}

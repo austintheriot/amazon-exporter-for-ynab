@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AmazonCharge } from './amazon';
-import { decideAfterPage, finalizeCharges } from './paging';
+import { decideAfterPage, finalizeCharges, oldestDate } from './paging';
 
 const baseInput = {
   page: 1,
@@ -49,6 +49,19 @@ describe('decideAfterPage', () => {
         chargesSoFar: 3,
       }),
     ).toEqual({ kind: 'fetch-next', body: 'next=1' });
+  });
+
+  it('does not stop as empty-first-page when page 1 has credits only', () => {
+    expect(
+      decideAfterPage({ ...baseInput, pageCharges: 0, pageCredits: 2, chargesSoFar: 0 }),
+    ).toEqual({ kind: 'fetch-next', body: 'next=1' });
+  });
+
+  it('stops when charges so far exceed the limit', () => {
+    expect(decideAfterPage({ ...baseInput, chargesSoFar: 101 })).toEqual({
+      kind: 'stop',
+      reason: 'limit',
+    });
   });
 
   it('stops when the page holds a row older than sinceDate', () => {
@@ -149,5 +162,21 @@ describe('finalizeCharges', () => {
     const credits = [charge('2025-02-01'), charge('2025-02-02'), charge('2025-02-03')];
     const result = finalizeCharges([], credits, { ...window, limit: 1 });
     expect(result.credits).toHaveLength(3);
+  });
+});
+
+describe('oldestDate', () => {
+  it('returns null for an empty list', () => {
+    expect(oldestDate([])).toBeNull();
+  });
+
+  it('returns the date of a single-kind list', () => {
+    expect(oldestDate([charge('2025-03-01'), charge('2025-02-01')])).toBe('2025-02-01');
+  });
+
+  it('picks the earliest across charges and credits', () => {
+    const charges = [charge('2025-03-01')];
+    const credits = [charge('2025-01-15'), charge('2025-04-01')];
+    expect(oldestDate([...charges, ...credits])).toBe('2025-01-15');
   });
 });
