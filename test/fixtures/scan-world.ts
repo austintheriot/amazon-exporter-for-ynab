@@ -52,10 +52,12 @@ export function buildLegacyInvoice(
   return `<html><body><b>Order Placed:</b> ${placed}<br/><table>${rows}</table><table><tr><td><b>Grand Total:</b></td><td><b>$${total.toFixed(2)}</b></td></tr></table></body></html>`;
 }
 
+export type WireTransaction = YnabTransaction & { cleared: string; approved: boolean };
+
 export function ynabTransaction(
   fields: Pick<YnabTransaction, 'id' | 'date' | 'amount'> &
     Partial<YnabTransaction>,
-): YnabTransaction {
+): WireTransaction {
   return {
     payee_name: 'Amazon.com',
     memo: null,
@@ -76,7 +78,7 @@ export interface ScanWorldOptions {
   hasToken?: boolean;
   transactionPages: string[];
   invoices?: Record<string, string | HttpReply>;
-  ynab?: { status?: number; transactions: YnabTransaction[] };
+  ynab?: { status?: number; transactions: unknown[] };
   putStatuses?: Record<string, number>;
 }
 

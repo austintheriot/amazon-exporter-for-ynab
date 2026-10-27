@@ -1,17 +1,19 @@
 import { YnabAuthError } from '../core/errors';
-import type {
-  YnabBudget,
-  YnabSplit,
-  YnabTransaction,
+import {
+  parseBudgetsResponse,
+  parseTransactionsResponse,
+  type YnabBudget,
+  type YnabSplit,
+  type YnabTransaction,
 } from '../core/ynab';
 
 const BASE_URL = 'https://api.ynab.com/v1';
 
-async function request<T>(
+async function request(
   accessToken: string,
   path: string,
   init?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
-): Promise<T> {
+): Promise<unknown> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -26,13 +28,12 @@ async function request<T>(
   if (!res.ok) {
     throw new Error(`YNAB API error ${String(res.status)}: ${await res.text()}`);
   }
-  const body = (await res.json()) as { data: T };
-  return body.data;
+  const body: unknown = await res.json();
+  return body;
 }
 
 export async function getBudgets(accessToken: string): Promise<YnabBudget[]> {
-  const data = await request<{ budgets: YnabBudget[] }>(accessToken, '/budgets');
-  return data.budgets.map(({ id, name }) => ({ id, name }));
+  return parseBudgetsResponse(await request(accessToken, '/budgets'));
 }
 
 export async function getTransactions(
@@ -40,11 +41,9 @@ export async function getTransactions(
   budgetId: string,
   sinceDate: string,
 ): Promise<YnabTransaction[]> {
-  const data = await request<{ transactions: YnabTransaction[] }>(
-    accessToken,
-    `/budgets/${budgetId}/transactions?since_date=${sinceDate}`,
+  return parseTransactionsResponse(
+    await request(accessToken, `/budgets/${budgetId}/transactions?since_date=${sinceDate}`),
   );
-  return data.transactions;
 }
 
 export async function updateTransactionMemo(

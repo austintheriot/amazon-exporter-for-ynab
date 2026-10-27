@@ -23,8 +23,6 @@ const txn = (
   amount,
   payee_name: payee,
   memo,
-  cleared: 'cleared',
-  approved: true,
   category_name: category,
 });
 

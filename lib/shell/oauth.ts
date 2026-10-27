@@ -4,7 +4,7 @@ import {
   isTokenUsable,
   oauthConfigured,
   parseAuthRedirect,
-  type StoredToken,
+  parseStoredToken,
 } from '@/lib/core/oauth';
 
 /** YNAB OAuth (implicit grant). Fully client-side: the access token comes
@@ -20,7 +20,7 @@ export function oauthRedirectUri(): string {
 
 async function readStored(): Promise<string | null> {
   const stored = await browser.storage.local.get(TOKEN_KEY);
-  const token = stored[TOKEN_KEY] as StoredToken | undefined;
+  const token = parseStoredToken(stored[TOKEN_KEY]);
   if (!token || !isTokenUsable(token, Date.now())) return null;
   return token.accessToken;
 }

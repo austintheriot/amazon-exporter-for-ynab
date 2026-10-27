@@ -1,4 +1,5 @@
 import { load, type CheerioAPI } from 'cheerio/slim';
+import { z } from 'zod/mini';
 
 export const TRANSACTIONS_URL =
   'https://www.amazon.com/cpe/yourpayments/transactions';
@@ -87,27 +88,43 @@ export function parseTransactionsPage($: CheerioAPI): {
     : parseTransactionsJson($('script#__NEXT_DATA__').first().text() || '{}');
 }
 
-interface NextDataJson {
-  props?: {
-    pageProps?: {
-      state?: {
-        transactionResponseState?: {
-          visibleTransactionResponse?: { transactionList?: TransactionJson[] };
-        };
-      };
-    };
-  };
-}
+const nextDataSchema = z.object({
+  props: z.object({
+    pageProps: z.object({
+      state: z.object({
+        transactionResponseState: z.object({
+          visibleTransactionResponse: z.object({
+            transactionList: z.array(z.unknown()),
+          }),
+        }),
+      }),
+    }),
+  }),
+});
 
-interface TransactionJson {
-  formattedAmount?: string;
-  formattedDate?: string;
-  orderData?: { orderDisplayString?: string }[];
-  statusInfo?: { amountDetailsStatusType?: string };
-  paymentMethodDisplayStringData?: {
-    paymentMethodName?: string;
-    paymentMethodNumber?: { lastDigits?: string };
-  };
+const transactionRowSchema = z.object({
+  formattedAmount: z.optional(z.string()),
+  formattedDate: z.optional(z.string()),
+  orderData: z.optional(z.array(z.object({ orderDisplayString: z.optional(z.string()) }))),
+  statusInfo: z.optional(z.object({ amountDetailsStatusType: z.optional(z.string()) })),
+  paymentMethodDisplayStringData: z.optional(
+    z.object({
+      paymentMethodName: z.optional(z.string()),
+      paymentMethodNumber: z.optional(z.object({ lastDigits: z.optional(z.string()) })),
+    }),
+  ),
+});
+
+function transactionRows(nextData: string): z.infer<typeof transactionRowSchema>[] {
+  const envelope = nextDataSchema.safeParse(JSON.parse(nextData));
+  if (!envelope.success) return [];
+  const list =
+    envelope.data.props.pageProps.state.transactionResponseState.visibleTransactionResponse
+      .transactionList;
+  return list.flatMap((row) => {
+    const parsed = transactionRowSchema.safeParse(row);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 function parseTransactionsJson(nextData: string): {
@@ -116,21 +133,17 @@ function parseTransactionsJson(nextData: string): {
 } {
   const charges: AmazonCharge[] = [];
   const credits: AmazonCharge[] = [];
-  const parsed = JSON.parse(nextData) as NextDataJson | null;
-  const list =
-    parsed?.props?.pageProps?.state?.transactionResponseState
-      ?.visibleTransactionResponse?.transactionList ?? [];
-  for (const t of list) {
-    const amount = t.formattedAmount?.match(/\$([\d,]+\.\d{2})/)?.[1];
-    const dateText = t.formattedDate?.match(LONG_DATE_PATTERN)?.[1];
+  for (const row of transactionRows(nextData)) {
+    const amount = row.formattedAmount?.match(/\$([\d,]+\.\d{2})/)?.[1];
+    const dateText = row.formattedDate?.match(LONG_DATE_PATTERN)?.[1];
     const date = dateText ? toIsoDate(dateText) : null;
-    const orderId = t.orderData?.[0]?.orderDisplayString?.match(
+    const orderId = row.orderData?.[0]?.orderDisplayString?.match(
       /((?:D\d{2}|\d{3})-\d{7}-\d{7})/,
     )?.[1];
     if (!amount || !date || !orderId) continue;
-    const card = t.paymentMethodDisplayStringData;
+    const card = row.paymentMethodDisplayStringData;
     const digits = card?.paymentMethodNumber?.lastDigits;
-    (t.statusInfo?.amountDetailsStatusType === 'Refund' ? credits : charges).push({
+    (row.statusInfo?.amountDetailsStatusType === 'Refund' ? credits : charges).push({
       orderId,
       date,
       amount: parseFloat(amount.replace(/,/g, '')),
@@ -202,6 +215,11 @@ export function buildNextPageBody($: CheerioAPI): string | null {
 }
 
 // --- Order invoice (item names for the memo) ---
+
+/** The invoice pages that scripts/parse-captures.ts replays through parseInvoice. */
+export const invoiceCapturesSchema = z.array(
+  z.object({ orderId: z.string(), html: z.string() }),
+);
 
 /** Parse the invoice / Order Details page into a structured order. Handles
  * both the modern data-component page and the legacy print invoice. Returns

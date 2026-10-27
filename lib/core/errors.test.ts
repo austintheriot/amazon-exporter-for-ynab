@@ -6,12 +6,18 @@ import {
   RECONNECT_MESSAGE,
   YnabAuthError,
 } from './errors';
+import { YnabResponseError } from './ynab';
 
 describe('errorMessage', () => {
   it('maps AmazonSessionError to the sign-in message', () => {
     expect(errorMessage(new AmazonSessionError('x'))).toBe(
       'Not signed in to Amazon. Open amazon.com, sign in, then scan again.',
     );
+  });
+
+  it('returns the YnabResponseError message as is', () => {
+    const message = 'YNAB /transactions response invalid at data.transactions.3.amount: bad';
+    expect(errorMessage(new YnabResponseError(message))).toBe(message);
   });
 
   it('maps YnabAuthError to the reconnect message', () => {

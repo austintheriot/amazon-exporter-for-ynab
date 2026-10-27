@@ -42,6 +42,30 @@ describe('parseAuthRedirect', () => {
     ).toBeNull();
   });
 
+  it('returns a token that expires now when expires_in is missing', () => {
+    expect(
+      parseAuthRedirect('https://x.chromiumapp.org/#access_token=abc', 1_000),
+    ).toEqual({ accessToken: 'abc', expiresAt: 1_000 });
+  });
+
+  it('returns null when the access token is empty', () => {
+    expect(
+      parseAuthRedirect(
+        'https://x.chromiumapp.org/#access_token=&expires_in=7200',
+        1_000,
+      ),
+    ).toBeNull();
+  });
+
+  it('returns null when expires_in is infinite', () => {
+    expect(
+      parseAuthRedirect(
+        'https://x.chromiumapp.org/#access_token=abc&expires_in=Infinity',
+        1_000,
+      ),
+    ).toBeNull();
+  });
+
   it('returns null for an invalid URL', () => {
     expect(parseAuthRedirect('not a url', 1_000)).toBeNull();
   });

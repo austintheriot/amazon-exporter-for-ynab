@@ -6,7 +6,7 @@ import {
   YnabAuthError,
 } from '@/lib/core/errors';
 import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
-import type { Message } from '@/lib/core/state';
+import { parseMessage } from '@/lib/core/state';
 import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
 import { disconnect, getAccessToken } from '@/lib/shell/oauth';
 import { getSettings, getState, setState } from '@/lib/shell/storage';
@@ -105,7 +105,9 @@ export async function runApply(txnIds: string[]): Promise<void> {
 }
 
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((message: Message) => {
+  browser.runtime.onMessage.addListener((raw: unknown) => {
+    const message = parseMessage(raw);
+    if (!message) return false;
     switch (message.type) {
       case 'scan':
         void runScan();

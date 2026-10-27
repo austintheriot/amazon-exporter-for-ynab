@@ -1,6 +1,6 @@
 import {
-  DEFAULT_SETTINGS,
-  DEFAULT_STATE,
+  parseSettings,
+  parseSyncState,
   type Settings,
   type SyncState,
 } from '../core/state';
@@ -10,7 +10,7 @@ const STATE_KEY = 'syncState';
 
 export async function getSettings(): Promise<Settings> {
   const stored = await browser.storage.local.get(SETTINGS_KEY);
-  return { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] ?? {}) };
+  return parseSettings(stored[SETTINGS_KEY]);
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {
@@ -19,7 +19,7 @@ export async function saveSettings(settings: Settings): Promise<void> {
 
 export async function getState(): Promise<SyncState> {
   const stored = await browser.storage.local.get(STATE_KEY);
-  return { ...DEFAULT_STATE, ...(stored[STATE_KEY] ?? {}) };
+  return parseSyncState(stored[STATE_KEY]);
 }
 
 export async function setState(patch: Partial<SyncState>): Promise<SyncState> {

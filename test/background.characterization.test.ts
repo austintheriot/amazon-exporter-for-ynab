@@ -391,6 +391,33 @@ describe('runScan failures', () => {
     expect(await world.readToken()).toBeUndefined();
   });
 
+  it('ynab malformed: a string amount fails the scan and keeps the token', async () => {
+    const world = await createScanWorld({
+      transactionPages: [
+        buildTransactionsPage([
+          { date: 'June 28, 2026', amount: '-$67.39', orderId: ORDER_SPLIT },
+        ]),
+      ],
+      ynab: {
+        transactions: [
+          ynabTransaction({ id: 'txn-a', date: '2026-06-29', amount: -67_390 }),
+          { ...ynabTransaction({ id: 'txn-b', date: '2026-06-29', amount: 0 }), amount: '12' },
+        ],
+      },
+    });
+    await runScan();
+
+    expect(await world.readState()).toEqual({
+      ...EMPTY_STATE_FIELDS,
+      status: 'error',
+      message:
+        'YNAB /transactions response invalid at data.transactions.1.amount: ' +
+        'Invalid input: expected number, received string',
+    });
+    expect(await world.readToken()).toBeDefined();
+    expect(world.requests).toEqual([TRANSACTIONS_URL, ynabUrl('2026-02-01')]);
+  });
+
   it('Amazon sign-in page reports not signed in', async () => {
     const world = await createScanWorld({
       transactionPages: ['<html><body><h1>Sign in</h1></body></html>'],
