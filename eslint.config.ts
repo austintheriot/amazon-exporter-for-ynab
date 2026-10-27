@@ -3,31 +3,61 @@ import vitest from '@vitest/eslint-plugin';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
-const purityMessage = 'lib/core is pure: take the value as a parameter; the shell supplies it.';
+const replacement = {
+  clock: 'Pass the clock in from the shell.',
+  random: 'Pass the random source in from the shell.',
+  network: 'Do network IO in lib/shell and pass the result in.',
+  extensionApi: 'Call the extension API in lib/shell and pass the result in.',
+  storage: 'Read storage in lib/shell and pass the stored value in.',
+  scheduling: 'Schedule work in lib/shell and return the plan as data.',
+  logging: 'Return the message as data and log it in lib/shell.',
+  hostGlobal: 'Read the value in lib/shell and pass it in as a parameter.',
+  process: 'Read env and argv in the shell and pass the values in.',
+  files: 'Do file and path work in lib/shell and pass the result in.',
+  shellImport: 'Have lib/shell call lib/core and pass the values in.',
+  wxt: 'Call wxt in lib/shell and pass the result in.',
+  node: 'Use Node APIs in lib/shell and pass the result in.',
+  dynamicImport: 'Use a static import of a lib/core module. IO modules belong in lib/shell.',
+} as const;
 
-const bannedGlobals = [
-  'fetch',
-  'browser',
-  'chrome',
-  'window',
-  'document',
-  'localStorage',
-  'sessionStorage',
-  'indexedDB',
-  'XMLHttpRequest',
-  'WebSocket',
-  'setTimeout',
-  'setInterval',
-  'queueMicrotask',
-  'console',
+const banned = (what: string, fix: string): string => `${what} is banned in lib/core (pure). ${fix}`;
+
+const bannedGlobals: readonly (readonly [string, string])[] = [
+  ['fetch', replacement.network],
+  ['XMLHttpRequest', replacement.network],
+  ['WebSocket', replacement.network],
+  ['browser', replacement.extensionApi],
+  ['chrome', replacement.extensionApi],
+  ['localStorage', replacement.storage],
+  ['sessionStorage', replacement.storage],
+  ['indexedDB', replacement.storage],
+  ['setTimeout', replacement.scheduling],
+  ['setInterval', replacement.scheduling],
+  ['queueMicrotask', replacement.scheduling],
+  ['console', replacement.logging],
+  ['window', replacement.hostGlobal],
+  ['document', replacement.hostGlobal],
+  ['navigator', replacement.hostGlobal],
+  ['location', replacement.hostGlobal],
+  ['self', replacement.hostGlobal],
+  ['globalThis', replacement.hostGlobal],
+  ['process', replacement.process],
 ];
 
 const bannedCalls = [
-  ['Date', 'now'],
-  ['Math', 'random'],
-  ['performance', 'now'],
-  ['crypto', 'getRandomValues'],
-  ['crypto', 'randomUUID'],
+  ['Date', 'now', replacement.clock],
+  ['performance', 'now', replacement.clock],
+  ['Math', 'random', replacement.random],
+  ['crypto', 'getRandomValues', replacement.random],
+  ['crypto', 'randomUUID', replacement.random],
+] as const;
+
+const bannedModules = [
+  ['wxt', replacement.wxt],
+  ['fs', replacement.files],
+  ['fs/promises', replacement.files],
+  ['path', replacement.files],
+  ['path/posix', replacement.files],
 ] as const;
 
 export default defineConfig(
@@ -49,28 +79,36 @@ export default defineConfig(
     rules: {
       'no-restricted-globals': [
         'error',
-        ...bannedGlobals.map((name) => ({ name, message: purityMessage })),
+        ...bannedGlobals.map(([name, fix]) => ({ name, message: banned(name, fix) })),
       ],
       'no-restricted-syntax': [
         'error',
-        ...bannedCalls.map(([object, method]) => ({
+        ...bannedCalls.map(([object, method, fix]) => ({
           selector: `CallExpression[callee.object.name='${object}'][callee.property.name='${method}']`,
-          message: `${object}.${method}() is banned. ${purityMessage}`,
+          message: banned(`${object}.${method}()`, fix),
         })),
         {
           selector: "NewExpression[callee.name='Date'][arguments.length=0]",
-          message: `new Date() with no argument is banned. ${purityMessage}`,
+          message: banned('new Date() with no argument', replacement.clock),
+        },
+        {
+          selector: "CallExpression[callee.name='Date']",
+          message: banned('Date() without new', replacement.clock),
+        },
+        {
+          selector: 'ImportExpression',
+          message: banned('Dynamic import()', replacement.dynamicImport),
         },
       ],
       'no-restricted-imports': [
         'error',
         {
-          paths: ['wxt', 'fs', 'path'].map((name) => ({ name, message: purityMessage })),
+          paths: bannedModules.map(([name, fix]) => ({ name, message: banned(`'${name}'`, fix) })),
           patterns: [
-            { regex: '(^|/)lib/shell(/|$)', message: purityMessage },
-            { regex: '^\\.\\./shell(/|$)', message: purityMessage },
-            { regex: '^wxt/', message: purityMessage },
-            { regex: '^node:', message: purityMessage },
+            { regex: '(^|/)lib/shell(/|$)', message: banned('Importing lib/shell', replacement.shellImport) },
+            { regex: '^\\.\\./shell(/|$)', message: banned('Importing lib/shell', replacement.shellImport) },
+            { regex: '^wxt/', message: banned('Importing wxt', replacement.wxt) },
+            { regex: '^node:', message: banned('Importing node: modules', replacement.node) },
           ],
         },
       ],
