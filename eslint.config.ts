@@ -79,5 +79,12 @@ export default defineConfig(
   {
     files: ['**/*.test.ts'],
     ...vitest.configs.recommended,
+    rules: {
+      ...vitest.configs.recommended.rules,
+      'vitest/no-standalone-expect': [
+        'error',
+        { additionalTestBlockFunctions: ['it.prop'] },
+      ],
+    },
   },
 );
