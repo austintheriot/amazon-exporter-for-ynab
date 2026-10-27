@@ -1,40 +1,16 @@
 import { z } from 'zod/mini';
-import type { MatchProposal } from './matcher';
-import type { AmazonCharge, DebugCapture, ScanCounts } from './amazon';
+import { matchProposalSchema } from './proposal';
 
-/** Snapshot of both sides of the matching input, for debug export. */
-export interface ScanDebug {
-  charges: AmazonCharge[];
-  credits: AmazonCharge[];
-  candidates: {
-    id: string;
-    date: string;
-    amount: number;
-    payee: string;
-    hasMemo: boolean;
-  }[];
-}
+const settingsObjectSchema = z.object({
+  budgetId: z.string(),
+  budgetName: z.string(),
+  /** null = recent orders (no year filter) */
+  year: z.nullable(z.number()),
+  maxDays: z.number(),
+  orderLimit: z.number(),
+});
 
-export interface Settings {
-  budgetId: string;
-  budgetName: string;
-  year: number | null; // null = recent orders (no year filter)
-  maxDays: number;
-  orderLimit: number;
-}
-
-export type SyncStatus = 'idle' | 'scanning' | 'applying' | 'done' | 'error';
-
-export interface SyncState {
-  status: SyncStatus;
-  message: string;
-  proposals: MatchProposal[];
-  counts: ScanCounts | null;
-  appliedTxnIds: string[];
-  lastScanAt: string | null;
-  debugCaptures: DebugCapture[];
-  scanDebug: ScanDebug | null;
-}
+export type Settings = z.infer<typeof settingsObjectSchema>;
 
 export const DEFAULT_SETTINGS: Settings = {
   budgetId: '',
@@ -44,37 +20,16 @@ export const DEFAULT_SETTINGS: Settings = {
   orderLimit: 50,
 };
 
-export const DEFAULT_STATE: SyncState = {
-  status: 'idle',
-  message: '',
-  proposals: [],
-  counts: null,
-  appliedTxnIds: [],
-  lastScanAt: null,
-  debugCaptures: [],
-  scanDebug: null,
-};
-
-const messageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('scan') }),
-  z.object({ type: z.literal('apply'), txnIds: z.array(z.string()) }),
-]);
-
-export type Message = z.infer<typeof messageSchema>;
-
-export function parseMessage(raw: unknown): Message | null {
-  const result = messageSchema.safeParse(raw);
-  return result.success ? result.data : null;
-}
+const settingsFields = settingsObjectSchema.shape;
 
 const settingsSchema = z.catch(
   z.object({
-    budgetId: z.catch(z.string(), DEFAULT_SETTINGS.budgetId),
-    budgetName: z.catch(z.string(), DEFAULT_SETTINGS.budgetName),
-    year: z.catch(z.nullable(z.number()), DEFAULT_SETTINGS.year),
-    maxDays: z.catch(z.number(), DEFAULT_SETTINGS.maxDays),
-    orderLimit: z.catch(z.number(), DEFAULT_SETTINGS.orderLimit),
-  }),
+    budgetId: z.catch(settingsFields.budgetId, DEFAULT_SETTINGS.budgetId),
+    budgetName: z.catch(settingsFields.budgetName, DEFAULT_SETTINGS.budgetName),
+    year: z.catch(settingsFields.year, DEFAULT_SETTINGS.year),
+    maxDays: z.catch(settingsFields.maxDays, DEFAULT_SETTINGS.maxDays),
+    orderLimit: z.catch(settingsFields.orderLimit, DEFAULT_SETTINGS.orderLimit),
+  } satisfies Record<keyof Settings, unknown>),
   () => ({ ...DEFAULT_SETTINGS }),
 );
 
@@ -82,24 +37,15 @@ export function parseSettings(raw: unknown): Settings {
   return settingsSchema.parse(raw);
 }
 
+const syncStatusSchema = z.enum(['idle', 'scanning', 'applying', 'done', 'error']);
+
+export type SyncStatus = z.infer<typeof syncStatusSchema>;
+
 const chargeSchema = z.object({
   orderId: z.string(),
   date: z.string(),
   amount: z.number(),
   paymentMethod: z.string(),
-});
-
-const proposalSchema = z.object({
-  kind: z.enum(['charge', 'refund']),
-  orderId: z.string(),
-  orderDate: z.string(),
-  orderTotal: z.number(),
-  items: z.array(z.string()),
-  txnId: z.string(),
-  txnDate: z.string(),
-  txnPayee: z.string(),
-  memo: z.string(),
-  splits: z.optional(z.array(z.object({ amount: z.number(), memo: z.string() }))),
 });
 
 const countsSchema = z.object({
@@ -117,6 +63,7 @@ const captureSchema = z.object({
   html: z.string(),
 });
 
+/** Snapshot of both sides of the matching input, for debug export. */
 const scanDebugSchema = z.object({
   charges: z.array(chargeSchema),
   credits: z.array(chargeSchema),
@@ -131,23 +78,60 @@ const scanDebugSchema = z.object({
   ),
 });
 
+export type ScanDebug = z.infer<typeof scanDebugSchema>;
+
+const syncStateObjectSchema = z.object({
+  status: syncStatusSchema,
+  message: z.string(),
+  proposals: z.array(matchProposalSchema),
+  counts: z.nullable(countsSchema),
+  appliedTxnIds: z.array(z.string()),
+  lastScanAt: z.nullable(z.string()),
+  debugCaptures: z.array(captureSchema),
+  scanDebug: z.nullable(scanDebugSchema),
+});
+
+export type SyncState = z.infer<typeof syncStateObjectSchema>;
+
+export const DEFAULT_STATE: SyncState = {
+  status: 'idle',
+  message: '',
+  proposals: [],
+  counts: null,
+  appliedTxnIds: [],
+  lastScanAt: null,
+  debugCaptures: [],
+  scanDebug: null,
+};
+
+const syncStateFields = syncStateObjectSchema.shape;
+
 const syncStateSchema = z.catch(
   z.object({
-    status: z.catch(
-      z.enum(['idle', 'scanning', 'applying', 'done', 'error']),
-      DEFAULT_STATE.status,
-    ),
-    message: z.catch(z.string(), DEFAULT_STATE.message),
-    proposals: z.catch(z.array(proposalSchema), () => []),
-    counts: z.catch(z.nullable(countsSchema), DEFAULT_STATE.counts),
-    appliedTxnIds: z.catch(z.array(z.string()), () => []),
-    lastScanAt: z.catch(z.nullable(z.string()), DEFAULT_STATE.lastScanAt),
-    debugCaptures: z.catch(z.array(captureSchema), () => []),
-    scanDebug: z.catch(z.nullable(scanDebugSchema), DEFAULT_STATE.scanDebug),
-  }),
+    status: z.catch(syncStateFields.status, DEFAULT_STATE.status),
+    message: z.catch(syncStateFields.message, DEFAULT_STATE.message),
+    proposals: z.catch(syncStateFields.proposals, () => []),
+    counts: z.catch(syncStateFields.counts, DEFAULT_STATE.counts),
+    appliedTxnIds: z.catch(syncStateFields.appliedTxnIds, () => []),
+    lastScanAt: z.catch(syncStateFields.lastScanAt, DEFAULT_STATE.lastScanAt),
+    debugCaptures: z.catch(syncStateFields.debugCaptures, () => []),
+    scanDebug: z.catch(syncStateFields.scanDebug, DEFAULT_STATE.scanDebug),
+  } satisfies Record<keyof SyncState, unknown>),
   () => ({ ...DEFAULT_STATE, proposals: [], appliedTxnIds: [], debugCaptures: [] }),
 );
 
 export function parseSyncState(raw: unknown): SyncState {
   return syncStateSchema.parse(raw);
+}
+
+const messageSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('scan') }),
+  z.object({ type: z.literal('apply'), txnIds: z.array(z.string()) }),
+]);
+
+export type Message = z.infer<typeof messageSchema>;
+
+export function parseMessage(raw: unknown): Message | null {
+  const result = messageSchema.safeParse(raw);
+  return result.success ? result.data : null;
 }

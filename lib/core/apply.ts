@@ -1,4 +1,4 @@
-import type { MatchProposal } from './matcher';
+import type { MatchProposal } from './proposal';
 
 export function selectProposals(proposals: MatchProposal[], txnIds: string[]): MatchProposal[] {
   const selected = new Set(txnIds);

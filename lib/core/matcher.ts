@@ -14,20 +14,6 @@ export function isAmazonPayee(name: string | null | undefined): boolean {
   return AMAZON_PAYEE_PATTERN.test(name ?? '');
 }
 
-export interface MatchProposal {
-  kind: 'charge' | 'refund';
-  orderId: string;
-  orderDate: string; // charge/credit date
-  orderTotal: number; // charge/credit amount
-  items: string[];
-  txnId: string;
-  txnDate: string;
-  txnPayee: string;
-  memo: string;
-  /** When present, applying also turns the transaction into a split */
-  splits?: YnabSplit[] | undefined;
-}
-
 export interface ChargeMatch {
   charge: AmazonCharge;
   txn: YnabTransaction;

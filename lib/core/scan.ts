@@ -8,8 +8,8 @@ import {
   matchCharges,
   matchRefunds,
   type ChargeMatch,
-  type MatchProposal,
 } from './matcher';
+import type { MatchProposal } from './proposal';
 import type { ScanDebug, Settings } from './state';
 import type { YnabTransaction } from './ynab';
 

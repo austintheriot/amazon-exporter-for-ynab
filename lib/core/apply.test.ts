@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyStartMessage, applySummary, selectProposals } from './apply';
-import type { MatchProposal } from './matcher';
+import type { MatchProposal } from './proposal';
 
 const proposal = (txnId: string): MatchProposal => ({
   kind: 'charge',
