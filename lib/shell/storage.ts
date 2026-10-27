@@ -5,9 +5,11 @@ import {
   type Settings,
   type SyncState,
 } from '../core/state';
+import { parseYnabAuth, type YnabAuthStatus } from '../core/ynab-auth';
 
 const SETTINGS_KEY = 'settings';
 const STATE_KEY = 'syncState';
+export const YNAB_AUTH_KEY = 'ynabAuth';
 
 export async function getSettings(): Promise<Settings> {
   const stored = await browser.storage.local.get(SETTINGS_KEY);
@@ -43,4 +45,13 @@ export async function setStateIfCurrent(
   const stored = await getState();
   if (!isCurrent()) return;
   await browser.storage.local.set({ [STATE_KEY]: { ...stored, ...patch } });
+}
+
+export async function getYnabAuth(): Promise<YnabAuthStatus> {
+  const stored = await browser.storage.local.get(YNAB_AUTH_KEY);
+  return parseYnabAuth(stored[YNAB_AUTH_KEY]);
+}
+
+export async function setYnabAuth(status: YnabAuthStatus): Promise<void> {
+  await browser.storage.local.set({ [YNAB_AUTH_KEY]: status });
 }

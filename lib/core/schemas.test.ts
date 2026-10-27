@@ -330,6 +330,10 @@ describe('parseMessage', () => {
     expect(parseMessage({ type: 'reset' })).toEqual({ type: 'reset' });
   });
 
+  it('accepts a connectYnab message', () => {
+    expect(parseMessage({ type: 'connectYnab' })).toEqual({ type: 'connectYnab' });
+  });
+
   it('is null for an unknown type', () => {
     expect(parseMessage({ type: 'nope' })).toBeNull();
   });

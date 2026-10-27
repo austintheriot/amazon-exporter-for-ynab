@@ -9,6 +9,8 @@ import {
   saveSettings,
   setState,
   setStateIfCurrent,
+  getYnabAuth,
+  setYnabAuth,
 } from './storage';
 
 describe('resetState', () => {
@@ -93,5 +95,21 @@ describe('setStateIfCurrent', () => {
     await write;
 
     expect(await getState()).toEqual(DEFAULT_STATE);
+  });
+});
+
+describe('ynabAuth storage', () => {
+  beforeEach(() => {
+    fakeBrowser.reset();
+  });
+
+  it('is idle before anything is written', async () => {
+    expect(await getYnabAuth()).toEqual({ kind: 'idle' });
+  });
+
+  it('round-trips a connecting status', async () => {
+    const status = { kind: 'connecting', startedAt: '2026-10-27T12:00:00.000Z' } as const;
+    await setYnabAuth(status);
+    expect(await getYnabAuth()).toEqual(status);
   });
 });

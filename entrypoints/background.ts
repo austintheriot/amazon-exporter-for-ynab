@@ -6,14 +6,23 @@ import {
   errorMessage,
   missingSetupMessage,
   RECONNECT_MESSAGE,
+  YNAB_SIGN_IN_FAILED,
 } from '@/lib/core/copy';
 import { YnabAuthError } from '@/lib/core/errors';
 import { createRunGuard } from '@/lib/core/run-guard';
 import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
 import { parseMessage, type SyncState } from '@/lib/core/state';
 import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
-import { disconnect, getAccessToken } from '@/lib/shell/oauth';
-import { getSettings, getState, resetState, setStateIfCurrent } from '@/lib/shell/storage';
+import { isConnecting } from '@/lib/core/ynab-auth';
+import { authorize, disconnect, getAccessToken } from '@/lib/shell/oauth';
+import {
+  getSettings,
+  getState,
+  getYnabAuth,
+  resetState,
+  setStateIfCurrent,
+  setYnabAuth,
+} from '@/lib/shell/storage';
 import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
 const runGuard = createRunGuard();
@@ -140,6 +149,18 @@ async function runApply(txnIds: string[]): Promise<void> {
   await setState({ status: 'done', message: applySummary(toApply.length, failures) });
 }
 
+async function connectYnab(): Promise<void> {
+  if (isConnecting(await getYnabAuth(), new Date().toISOString())) return;
+  await setYnabAuth({ kind: 'connecting', startedAt: new Date().toISOString() });
+  try {
+    const token = await authorize(true);
+    await setYnabAuth(token ? { kind: 'idle' } : { kind: 'failed', message: YNAB_SIGN_IN_FAILED });
+  } catch (err) {
+    console.error('YNAB sign-in failed', err);
+    await setYnabAuth({ kind: 'failed', message: YNAB_SIGN_IN_FAILED });
+  }
+}
+
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((raw: unknown) => {
     const message = parseMessage(raw);
@@ -150,6 +171,9 @@ export default defineBackground(() => {
         break;
       case 'apply':
         void runApply(message.txnIds);
+        break;
+      case 'connectYnab':
+        void connectYnab();
         break;
       case 'reset':
         runGuard.cancelAll();
