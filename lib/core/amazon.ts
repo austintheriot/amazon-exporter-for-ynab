@@ -8,12 +8,6 @@ export const ORDER_DETAILS_URL =
 export const MAX_TRANSACTION_PAGES = 25;
 export const DEBUG_HTML_MAX = 500_000;
 
-export const AMAZON_ORIGINS = [
-  'https://www.amazon.com/*',
-  'https://amazon.com/*',
-];
-export const AMAZON_LOGIN_URL = 'https://www.amazon.com/orders';
-
 /** A card charge from the Your Payments → Transactions page. One order can
  * produce several charges (split shipments); amounts are what actually hit
  * the card. */

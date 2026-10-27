@@ -1,4 +1,4 @@
-import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/core/amazon';
+import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/core/amazon-config';
 import {
   authorize,
   disconnect,
