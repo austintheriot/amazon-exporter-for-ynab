@@ -6,7 +6,7 @@
 
 **Architecture:** The core takes fetched pages, YNAB data, settings, and the current date as plain data and returns proposals, decisions, and messages as data. The shell (`lib/shell/`, `entrypoints/`) does every fetch, storage access, and clock read. An ESLint block bans IO in `lib/core/`, and a test proves the ban fires. A temporary characterization test pins today's `background.ts` behavior during the extraction and is deleted at the end.
 
-**Tech Stack:** Bun 1.4 (package manager and script runner), WXT 0.21.4 on Vite 8, Vitest 4.1.x with `WxtVitest`, TypeScript 5.9.3, Cheerio, Zod 4, ESLint with `typescript-eslint`, fast-check.
+**Tech Stack:** Bun 1.4 (package manager and script runner), WXT 0.21.4 on Vite 8, Vitest 4.1.x with `WxtVitest`, TypeScript 6.0.3 (from 5.9.3, in Task 4), Cheerio, Zod 4, ESLint with `typescript-eslint`, fast-check.
 
 **Spec:** `docs/superpowers/specs/2026-10-26-bun-core-shell-tests-design.md`
 
@@ -17,6 +17,7 @@
 - No test makes a network request. No test touches live Amazon or YNAB.
 - `lib/core/` uses no `fetch`, `browser`, `chrome`, `Date.now()`, argument-less `new Date()`, `Math.random()`, timers, or `console`, and imports nothing from `lib/shell`, `wxt`, or `node:*`. `new Date(string)` is allowed.
 - No `!` non-null assertions in production code. Test files only, directly after a same-statement `expect(x).toBeDefined()`.
+- TypeScript 6.0.3, the newest version `typescript-eslint` supports (`<6.1.0`). Not 7.x.
 - New dependencies: newest release at least 14 days old. Vitest 4.1.x (WXT's own dev dependency is `^4.1.10`), not 5.x.
 - Bun runs scripts and installs. WXT, Vitest, and `tsc` run on Node through their shebangs. No `--bun`.
 - The lockfile migration keeps every current dependency version. No fresh resolve.
@@ -121,11 +122,11 @@ Pure move. No logic change except two parser helpers that replace inline checks.
 - [ ] **Step 3:** Run `bun run test && bun run typecheck && bun run build`. Expected: all pass, characterization test unchanged and green.
 - [ ] **Step 4:** Commit `refactor: split lib into core and shell`.
 
-### Task 4: Strict TypeScript, strict ESLint, and the core IO ban
+### Task 4: TypeScript 6, strict TypeScript, strict ESLint, and the core IO ban
 
 **Files:**
 - Create: `eslint.config.ts`, `lib/core/purity.lint.test.ts`
-- Modify: `package.json` (deps, `"lint": "eslint ."`), `tsconfig.json`, both workflows (add `bun run lint` before tests), every file with a violation
+- Modify: `package.json` (deps, `typescript` to `6.0.3`, `"lint": "eslint ."`), `tsconfig.json`, both workflows (add `bun run lint` before tests), every file with a violation
 
 **Interfaces:**
 - Produces: `bun run lint`. The core ban rules, each with message `lib/core is pure: take the value as a parameter; the shell supplies it.`
@@ -150,12 +151,12 @@ Pure move. No logic change except two parser helpers that replace inline checks.
 | `export const d = new Date('2026-01-01');` | none |
 
 Each failing assertion names the probe. Run. Expected: FAIL (no ESLint config).
-- [ ] **Step 2:** Install `eslint`, `@eslint/js`, `typescript-eslint`, and `jiti` (needed for a `.ts` config), each the newest release at least 14 days old. `eslint.config.ts`: ignores `.output`, `.wxt`, `node_modules`. `js.configs.recommended`, `tseslint.configs.strictTypeChecked`, `tseslint.configs.stylisticTypeChecked`, `parserOptions.projectService: true`. A block for `lib/core/**/*.ts` excluding `**/*.test.ts` with the three ban rules per the spec's lists. Add `@vitest/eslint-plugin` only under the spec's TypeScript 5.9 condition.
+- [ ] **Step 2:** Upgrade `typescript` to `6.0.3` (exact pin). Run `bun run typecheck` and fix any TypeScript 6 deprecation or default change (`types`, `baseUrl`, `moduleResolution`) without changing emitted behavior. Install `eslint`, `@eslint/js`, `typescript-eslint`, `@vitest/eslint-plugin`, and `jiti` (needed for a `.ts` config), each the newest release at least 14 days old. `eslint.config.ts`: ignores `.output`, `.wxt`, `node_modules`. `js.configs.recommended`, `tseslint.configs.strictTypeChecked`, `tseslint.configs.stylisticTypeChecked`, `parserOptions.projectService: true`. A block for `lib/core/**/*.ts` excluding `**/*.test.ts` with the three ban rules per the spec's lists. Add `@vitest/eslint-plugin` `recommended` for `**/*.test.ts`.
 - [ ] **Step 3:** Run `bun run test lib/core/purity.lint.test.ts`. Expected: PASS.
 - [ ] **Step 4:** `tsconfig.json`: remove `"noUncheckedIndexedAccess": false`, add `exactOptionalPropertyTypes`, `noImplicitReturns`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`, `useUnknownInCatchVariables` (all `true`).
 - [ ] **Step 5:** Run `bun run typecheck` and `bun run lint`. Fix every error without changing behavior. Replace each `!` (`priced[0]`, `i.price!`, `eventInput.attr('name')!`, `document.getElementById('app')!`, and any the new index checks expose) with a check that keeps today's result: an early `return null` where the surrounding function already returns `null` for missing data, and a thrown `Error` naming the missing element for `#app`. Use a line-level `eslint-disable-next-line <rule> -- <reason>` only when every fix would change behavior, and list each one in the commit body.
 - [ ] **Step 6:** Run `bun run lint && bun run typecheck && bun run test && bun run build`. Expected: zero errors, all tests green including the characterization test.
-- [ ] **Step 7:** Commit `build: strict TypeScript and ESLint with a pure-core IO ban`.
+- [ ] **Step 7:** Commit `build: TypeScript 6, strict TypeScript and ESLint with a pure-core IO ban`.
 
 ### Task 5: Paging decision in the core
 
