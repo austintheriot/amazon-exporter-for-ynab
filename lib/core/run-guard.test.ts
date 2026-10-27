@@ -31,4 +31,26 @@ describe('createRunGuard', () => {
     cancelled.cancelAll();
     expect(other.isCurrent(run)).toBe(true);
   });
+
+  it('aborts the signal of every run started before cancelAll', () => {
+    const guard = createRunGuard();
+    const first = guard.start();
+    const second = guard.start();
+    guard.cancelAll();
+    expect(guard.signal(first).aborted).toBe(true);
+    expect(guard.signal(second).aborted).toBe(true);
+  });
+
+  it('gives a run started after cancelAll a live signal', () => {
+    const guard = createRunGuard();
+    guard.cancelAll();
+    const run = guard.start();
+    expect(guard.signal(run).aborted).toBe(false);
+  });
+
+  it('leaves the signal live while nothing cancels', () => {
+    const guard = createRunGuard();
+    const run = guard.start();
+    expect(guard.signal(run).aborted).toBe(false);
+  });
 });

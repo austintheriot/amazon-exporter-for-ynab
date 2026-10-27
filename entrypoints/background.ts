@@ -21,11 +21,11 @@ function startRun() {
   const run = runGuard.start();
   const isCurrent = () => runGuard.isCurrent(run);
   const setState = (patch: Partial<SyncState>) => setStateIfCurrent(isCurrent, patch);
-  return { isCurrent, setState };
+  return { isCurrent, setState, signal: runGuard.signal(run) };
 }
 
 async function runScan(): Promise<void> {
-  const { setState } = startRun();
+  const { isCurrent, setState, signal } = startRun();
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken || !settings.budgetId) {
@@ -50,15 +50,22 @@ async function runScan(): Promise<void> {
       untilDate,
       limit: settings.orderLimit,
       onProgress,
+      signal,
     });
 
     await setState({ message: 'Reading YNAB transactions…' });
-    const transactions = await getTransactions(accessToken, settings.budgetId, ynabSinceDate);
+    const transactions = await getTransactions(
+      accessToken,
+      settings.budgetId,
+      ynabSinceDate,
+      signal,
+    );
 
     const matches = matchScan({ charges, credits, transactions, maxDays: settings.maxDays });
     const { orders, captures: invoiceCaptures } = await fetchOrderDetails(
       matches.orderIdsToFetch,
       onProgress,
+      signal,
     );
     const result = buildScanResult({
       matches,
@@ -78,6 +85,7 @@ async function runScan(): Promise<void> {
       lastScanAt: now,
     });
   } catch (err) {
+    if (!isCurrent()) return;
     console.error('Scan failed', err);
     if (err instanceof YnabAuthError) await disconnect();
     await setState({ status: 'error', message: errorMessage(err) });
@@ -85,7 +93,7 @@ async function runScan(): Promise<void> {
 }
 
 async function runApply(txnIds: string[]): Promise<void> {
-  const { isCurrent, setState } = startRun();
+  const { isCurrent, setState, signal } = startRun();
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken) {
@@ -108,10 +116,12 @@ async function runApply(txnIds: string[]): Promise<void> {
         proposal.txnId,
         proposal.memo,
         proposal.splits,
+        signal,
       );
       applied.push(proposal.txnId);
       await setState({ appliedTxnIds: applied });
     } catch (err) {
+      if (!isCurrent()) return;
       failures++;
       console.error('Failed to update memo', proposal.txnId, err);
     }

@@ -41,9 +41,12 @@ export async function getTransactions(
   accessToken: string,
   budgetId: string,
   sinceDate: string,
+  signal?: AbortSignal,
 ): Promise<YnabTransaction[]> {
   return parseTransactionsResponse(
-    await request(accessToken, `/budgets/${budgetId}/transactions?since_date=${sinceDate}`),
+    await request(accessToken, `/budgets/${budgetId}/transactions?since_date=${sinceDate}`, {
+      signal: signal ?? null,
+    }),
   );
 }
 
@@ -53,9 +56,11 @@ export async function updateTransactionMemo(
   transactionId: string,
   memo: string,
   splits?: YnabSplit[],
+  signal?: AbortSignal,
 ): Promise<void> {
   await request(accessToken, `/budgets/${budgetId}/transactions/${transactionId}`, {
     method: 'PUT',
+    signal: signal ?? null,
     body: JSON.stringify(buildMemoUpdateBody(memo, splits)),
   });
 }

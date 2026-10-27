@@ -26,7 +26,11 @@ interface FetchedPage {
   status: number;
 }
 
-async function fetchPage(url: string, init?: RequestInit): Promise<FetchedPage> {
+async function fetchPage(
+  url: string,
+  init?: RequestInit,
+  cancel?: AbortSignal,
+): Promise<FetchedPage> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -35,7 +39,7 @@ async function fetchPage(url: string, init?: RequestInit): Promise<FetchedPage> 
     const res = await fetch(url, {
       ...init,
       credentials: 'include',
-      signal: controller.signal,
+      signal: cancel ? AbortSignal.any([controller.signal, cancel]) : controller.signal,
     });
     if (res.status === 401 || res.status === 403) {
       throw new AmazonSessionError('Amazon session expired');
@@ -56,6 +60,7 @@ export interface FetchChargesOptions {
   untilDate?: string | undefined;
   limit: number;
   onProgress?: (message: string) => void;
+  signal?: AbortSignal | undefined;
 }
 
 export async function fetchAmazonCharges({
@@ -63,6 +68,7 @@ export async function fetchAmazonCharges({
   untilDate,
   limit,
   onProgress,
+  signal,
 }: FetchChargesOptions): Promise<{
   charges: AmazonCharge[];
   credits: AmazonCharge[];
@@ -84,6 +90,7 @@ export async function fetchAmazonCharges({
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: postBody,
           },
+      signal,
     );
     const $ = load(fetched.text);
     if (isSignInPage($)) {
@@ -131,9 +138,10 @@ export async function fetchAmazonCharges({
 
 async function fetchInvoice(
   orderId: string,
+  signal?: AbortSignal,
 ): Promise<{ order: AmazonOrder | null; capture: DebugCapture | null }> {
   const requestedUrl = `${ORDER_DETAILS_URL}?orderID=${orderId}`;
-  const page = await fetchPage(requestedUrl);
+  const page = await fetchPage(requestedUrl, undefined, signal);
   const $ = load(page.text);
   const order = isOrderNotFoundPage($) ? null : parseInvoice(page.text, orderId);
   const capture: DebugCapture | null = order
@@ -172,11 +180,12 @@ async function mapWithConcurrency<T, R>(
 export async function fetchOrderDetails(
   orderIds: string[],
   onProgress?: (message: string) => void,
+  signal?: AbortSignal,
 ): Promise<{ orders: Map<string, AmazonOrder>; captures: DebugCapture[] }> {
   const unique = [...new Set(orderIds)];
   onProgress?.(`Reading ${countOf(unique.length, 'Amazon order', 'Amazon orders')}…`);
   const results = await mapWithConcurrency(unique, DETAIL_CONCURRENCY, (id) =>
-    fetchInvoice(id).catch(() => ({ order: null, capture: null })),
+    fetchInvoice(id, signal).catch(() => ({ order: null, capture: null })),
   );
   const orders = new Map<string, AmazonOrder>();
   const captures: DebugCapture[] = [];
