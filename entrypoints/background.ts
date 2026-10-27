@@ -1,7 +1,8 @@
-import { selectProposals } from '@/lib/core/apply';
+import { applyBlocker, selectProposals } from '@/lib/core/apply';
 import {
   applyStartMessage,
   applySummary,
+  budgetMismatchMessage,
   errorMessage,
   missingSetupMessage,
   RECONNECT_MESSAGE,
@@ -33,6 +34,7 @@ async function runScan(): Promise<void> {
     return;
   }
   const now = new Date().toISOString();
+  const scanBudget = { scanBudgetId: settings.budgetId, scanBudgetName: settings.budgetName };
 
   await setState({
     status: 'scanning',
@@ -83,6 +85,7 @@ async function runScan(): Promise<void> {
       debugCaptures: result.debugCaptures,
       scanDebug: matches.scanDebug,
       lastScanAt: now,
+      ...scanBudget,
     });
   } catch (err) {
     if (!isCurrent()) return;
@@ -101,6 +104,13 @@ async function runApply(txnIds: string[]): Promise<void> {
     return;
   }
   const state = await getState();
+  if (applyBlocker({ selectedBudgetId: settings.budgetId, scanBudgetId: state.scanBudgetId })) {
+    await setState({
+      status: 'error',
+      message: budgetMismatchMessage(state.scanBudgetName, settings.budgetName),
+    });
+    return;
+  }
   const toApply = selectProposals(state.proposals, txnIds);
 
   await setState({ status: 'applying', message: applyStartMessage(toApply.length) });

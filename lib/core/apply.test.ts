@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { selectProposals } from './apply';
+import { applyBlocker, selectProposals } from './apply';
 import type { MatchProposal } from './proposal';
 
 const proposal = (txnId: string): MatchProposal => ({
@@ -25,5 +25,19 @@ describe('selectProposals', () => {
 
   it('ignores ids with no proposal', () => {
     expect(selectProposals([proposal('a')], ['z'])).toEqual([]);
+  });
+});
+
+describe('applyBlocker', () => {
+  it('blocks a scan stored before budgets were recorded', () => {
+    expect(applyBlocker({ selectedBudgetId: 'b1', scanBudgetId: null })).toBe('no-scan-budget');
+  });
+
+  it('blocks when the selected budget changed after the scan', () => {
+    expect(applyBlocker({ selectedBudgetId: 'b1', scanBudgetId: 'b2' })).toBe('budget-changed');
+  });
+
+  it('allows the budget the scan ran against', () => {
+    expect(applyBlocker({ selectedBudgetId: 'b1', scanBudgetId: 'b1' })).toBeNull();
   });
 });

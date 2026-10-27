@@ -263,8 +263,18 @@ describe('parseSyncState', () => {
     expect(parseSyncState(undefined)).toEqual(DEFAULT_STATE);
   });
 
-  it('round-trips a state written by 0.1.1', () => {
-    expect(parseSyncState(structuredClone(STATE_0_1_1))).toEqual(STATE_0_1_1);
+  it('reads a state written by 0.1.1 with no scan budget', () => {
+    expect(parseSyncState(structuredClone(STATE_0_1_1))).toEqual({
+      ...STATE_0_1_1,
+      scanBudgetId: null,
+      scanBudgetName: null,
+    });
+  });
+
+  it('keeps the budget a scan ran against', () => {
+    const state = parseSyncState({ ...STATE_0_1_1, scanBudgetId: 'b1', scanBudgetName: 'Household' });
+    expect(state.scanBudgetId).toBe('b1');
+    expect(state.scanBudgetName).toBe('Household');
   });
 
   it('accepts a proposal whose splits key is undefined', () => {
@@ -275,7 +285,7 @@ describe('parseSyncState', () => {
 
   it('drops extra fields', () => {
     const state = parseSyncState({ ...STATE_0_1_1, legacyFlag: true });
-    expect(state).toEqual(STATE_0_1_1);
+    expect(state).toEqual({ ...STATE_0_1_1, scanBudgetId: null, scanBudgetName: null });
     expect(state).not.toHaveProperty('legacyFlag');
   });
 
@@ -289,6 +299,8 @@ describe('parseSyncState', () => {
       }),
     ).toEqual({
       ...STATE_0_1_1,
+      scanBudgetId: null,
+      scanBudgetName: null,
       status: 'idle',
       counts: null,
       appliedTxnIds: [],

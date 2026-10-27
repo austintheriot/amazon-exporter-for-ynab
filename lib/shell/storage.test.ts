@@ -30,6 +30,16 @@ describe('resetState', () => {
     expect(await getState()).toEqual(DEFAULT_STATE);
   });
 
+  it('clears the budget the scan ran against', async () => {
+    await setState({ scanBudgetId: 'b1', scanBudgetName: 'Household' });
+
+    await resetState();
+
+    const state = await getState();
+    expect(state.scanBudgetId).toBeNull();
+    expect(state.scanBudgetName).toBeNull();
+  });
+
   it('clears a status stuck at scanning', async () => {
     await setState({ status: 'scanning', message: 'Fetching YNAB transactions…' });
 

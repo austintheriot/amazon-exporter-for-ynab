@@ -89,6 +89,8 @@ const syncStateObjectSchema = z.object({
   lastScanAt: z.nullable(z.string()),
   debugCaptures: z.array(captureSchema),
   scanDebug: z.nullable(scanDebugSchema),
+  scanBudgetId: z.nullable(z.string()),
+  scanBudgetName: z.nullable(z.string()),
 });
 
 export type SyncState = z.infer<typeof syncStateObjectSchema>;
@@ -102,6 +104,8 @@ export const DEFAULT_STATE: SyncState = {
   lastScanAt: null,
   debugCaptures: [],
   scanDebug: null,
+  scanBudgetId: null,
+  scanBudgetName: null,
 };
 
 const syncStateFields = syncStateObjectSchema.shape;
@@ -116,6 +120,8 @@ const syncStateSchema = z.catch(
     lastScanAt: z.catch(syncStateFields.lastScanAt, DEFAULT_STATE.lastScanAt),
     debugCaptures: z.catch(syncStateFields.debugCaptures, () => []),
     scanDebug: z.catch(syncStateFields.scanDebug, DEFAULT_STATE.scanDebug),
+    scanBudgetId: z.catch(syncStateFields.scanBudgetId, DEFAULT_STATE.scanBudgetId),
+    scanBudgetName: z.catch(syncStateFields.scanBudgetName, DEFAULT_STATE.scanBudgetName),
   } satisfies Record<keyof SyncState, unknown>),
   () => ({ ...DEFAULT_STATE, proposals: [], appliedTxnIds: [], debugCaptures: [] }),
 );
