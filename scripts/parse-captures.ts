@@ -1,8 +1,8 @@
 /* Run parseInvoice against real captured pages:
  *   bun scripts/parse-captures.ts ~/Downloads/ynab-amazon-debug.json */
 import { readFileSync } from 'node:fs';
-import { z } from 'zod/mini';
-import { invoiceCapturesSchema, parseInvoice } from '../lib/core/amazon';
+import { parseInvoice } from '../lib/core/amazon';
+import { parseCaptureFile } from './captures';
 
 const file = process.argv[2];
 if (!file) {
@@ -10,16 +10,14 @@ if (!file) {
   process.exit(1);
 }
 
-const parsed = invoiceCapturesSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')), {
-  error: z.locales.en().localeError,
-});
+const parsed = parseCaptureFile(JSON.parse(readFileSync(file, 'utf8')));
 if (!parsed.success) {
-  console.error(`invalid capture file ${file}:\n${z.prettifyError(parsed.error)}`);
+  console.error(`invalid capture file ${file}:\n${parsed.message}`);
   process.exit(1);
 }
 
 let failures = 0;
-for (const capture of parsed.data) {
+for (const capture of parsed.captures) {
   const order = parseInvoice(capture.html, capture.orderId);
   if (order) {
     console.log(
