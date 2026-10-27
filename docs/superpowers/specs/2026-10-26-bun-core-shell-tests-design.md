@@ -100,7 +100,10 @@ The fork goes its own way. It will not merge from or send changes to the upstrea
   - imports through `no-restricted-imports`: anything under `lib/shell` (by `@/lib/shell` and relative paths), `wxt` and `wxt/*`, `node:*`, `fs`, `path`.
 - Every ban message names the rule ("lib/core is pure") and the replacement ("take the value as a parameter; the shell supplies it").
 - `new Date(string)` for date parsing stays allowed. The matcher uses it for day differences.
-- The general lint (outside the core block) starts from `typescript-eslint`'s recommended rules. Existing violations outside the core rules get fixed only when the fix is mechanical and behavior-neutral. Otherwise turn the rule off with a comment that says why. The goal is the core ban, not a style cleanup. (My call.)
+- **Strictest standard lint (owner request, added after approval):** the whole project uses `@eslint/js` `recommended` plus `typescript-eslint` `strictTypeChecked` and `stylisticTypeChecked`, with type-aware linting (`parserOptions.projectService: true`). Every existing violation gets fixed. A rule may be turned off for a single line only with an `eslint-disable-next-line <rule> -- <reason>` comment, and only when the fix would change behavior. `@typescript-eslint/no-non-null-assertion` stays on in production code, which matches the owner's no-`!` rule. Each existing `!` gets a real check that keeps today's behavior.
+- **Strictest TypeScript settings (same request):** remove the `"noUncheckedIndexedAccess": false` override in `tsconfig.json` (WXT's base sets it to `true`), and add `exactOptionalPropertyTypes`, `noImplicitReturns`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals`, `noUnusedParameters`, and `useUnknownInCatchVariables`. Fix every resulting error without changing behavior.
+- **Test-file lint:** add `@vitest/eslint-plugin` `recommended` for `*.test.ts` only if a release at least 14 days old supports TypeScript 5.9. Today's latest (1.6.28) requires TypeScript 6 or newer. Do not upgrade TypeScript for this.
+- **Versions:** for every new dependency, install the newest release that is at least 14 days old.
 - `console` is banned in core. Today `lib/matcher.ts` and the parsers do not log, so this costs nothing.
 
 ### Zod at the boundaries
