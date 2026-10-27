@@ -174,6 +174,12 @@ describe('oldestDate', () => {
     expect(oldestDate([charge('2025-03-01'), charge('2025-02-01')])).toBe('2025-02-01');
   });
 
+  it('returns the earliest date of a credits-only list', () => {
+    const charges: AmazonCharge[] = [];
+    const credits = [charge('2025-05-02'), charge('2025-04-20'), charge('2025-06-01')];
+    expect(oldestDate([...charges, ...credits])).toBe('2025-04-20');
+  });
+
   it('picks the earliest across charges and credits', () => {
     const charges = [charge('2025-03-01')];
     const credits = [charge('2025-01-15'), charge('2025-04-01')];
