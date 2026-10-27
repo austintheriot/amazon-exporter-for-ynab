@@ -1,43 +1,25 @@
-import { AmazonSessionError, YnabAuthError } from '@/lib/core/errors';
+import { applyStartMessage, applySummary, selectProposals } from '@/lib/core/apply';
 import {
-  buildMemo,
-  buildRefundMemo,
-  buildSplits,
-  findOriginalTransaction,
-  matchCharges,
-  matchRefunds,
-  type MatchProposal,
-} from '@/lib/core/matcher';
+  errorMessage,
+  missingSetupMessage,
+  RECONNECT_MESSAGE,
+  YnabAuthError,
+} from '@/lib/core/errors';
+import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
 import type { Message } from '@/lib/core/state';
 import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
 import { disconnect, getAccessToken } from '@/lib/shell/oauth';
 import { getSettings, getState, setState } from '@/lib/shell/storage';
 import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
-const RECONNECT_MESSAGE = 'YNAB session expired. Reconnect YNAB in the popup.';
-
-function errorMessage(err: unknown): string {
-  if (err instanceof AmazonSessionError) {
-    return 'Not signed in to Amazon. Open amazon.com, sign in, then scan again.';
-  }
-  if (err instanceof YnabAuthError) {
-    return RECONNECT_MESSAGE;
-  }
-  return err instanceof Error ? err.message : String(err);
-}
-
 export async function runScan(): Promise<void> {
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken || !settings.budgetId) {
-    await setState({
-      status: 'error',
-      message: accessToken
-        ? 'Pick a budget first.'
-        : 'Connect YNAB in the popup first.',
-    });
+    await setState({ status: 'error', message: missingSetupMessage(!!accessToken) });
     return;
   }
+  const now = new Date().toISOString();
 
   await setState({
     status: 'scanning',
@@ -48,10 +30,7 @@ export async function runScan(): Promise<void> {
   });
   try {
     const onProgress = (message: string) => void setState({ message });
-    const sinceDate = settings.year
-      ? `${String(settings.year)}-01-01`
-      : new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
-    const untilDate = settings.year ? `${String(settings.year)}-12-31` : undefined;
+    const { sinceDate, untilDate, ynabSinceDate } = scanWindow(settings, now.slice(0, 10));
 
     const { charges, credits, captures } = await fetchAmazonCharges({
       sinceDate,
@@ -61,104 +40,29 @@ export async function runScan(): Promise<void> {
     });
 
     await setState({ message: 'Fetching YNAB transactions…' });
-    // Look back past the scan window so a refund's original purchase (and its
-    // category) is in range even when the return came weeks later.
-    const ynabSince = new Date(
-      new Date(`${sinceDate}T12:00:00Z`).getTime() - 60 * 86_400_000,
-    )
-      .toISOString()
-      .slice(0, 10);
-    const transactions = await getTransactions(
-      accessToken,
-      settings.budgetId,
-      ynabSince,
-    );
+    const transactions = await getTransactions(accessToken, settings.budgetId, ynabSinceDate);
 
-    const scanDebug = {
-      charges,
-      credits,
-      candidates: transactions
-        .filter((t) => /amazon|amzn/i.test(t.payee_name ?? ''))
-        .map((t) => ({
-          id: t.id,
-          date: t.date,
-          amount: t.amount,
-          payee: t.payee_name ?? '',
-          hasMemo: !!t.memo?.trim(),
-        })),
-    };
-
-    const matches = matchCharges(charges, transactions, settings.maxDays);
-    const refundMatches = matchRefunds(credits, transactions, settings.maxDays);
-    const nonDigital = matches.filter((m) => !m.charge.orderId.startsWith('D0'));
-    const refundsNonDigital = refundMatches.filter(
-      (m) => !m.charge.orderId.startsWith('D0'),
-    );
-    const digitalSkipped =
-      matches.length - nonDigital.length +
-      (refundMatches.length - refundsNonDigital.length);
-
+    const matches = matchScan({ charges, credits, transactions, maxDays: settings.maxDays });
     const { orders, captures: invoiceCaptures } = await fetchOrderDetails(
-      [...nonDigital, ...refundsNonDigital].map((m) => m.charge.orderId),
+      matches.orderIdsToFetch,
       onProgress,
     );
-
-    const proposals: MatchProposal[] = [];
-    for (const { charge, txn } of nonDigital) {
-      const order = orders.get(charge.orderId);
-      if (!order) continue;
-      const alreadySplit = (txn.subtransactions?.length ?? 0) > 0;
-      proposals.push({
-        kind: 'charge',
-        orderId: charge.orderId,
-        orderDate: charge.date,
-        orderTotal: charge.amount,
-        items: order.items.map((i) => i.name),
-        txnId: txn.id,
-        txnDate: txn.date,
-        txnPayee: txn.payee_name ?? '',
-        memo: buildMemo(order.items.map((i) => i.name), charge.orderId),
-        splits: alreadySplit
-          ? undefined
-          : buildSplits(order, charge.amount) ?? undefined,
-      });
-    }
-    for (const { charge: credit, txn } of refundsNonDigital) {
-      const order = orders.get(credit.orderId);
-      if (!order) continue;
-      const original = findOriginalTransaction(
-        order,
-        transactions,
-        settings.maxDays,
-      );
-      proposals.push({
-        kind: 'refund',
-        orderId: credit.orderId,
-        orderDate: credit.date,
-        orderTotal: credit.amount,
-        items: order.items.map((i) => i.name),
-        txnId: txn.id,
-        txnDate: txn.date,
-        txnPayee: txn.payee_name ?? '',
-        memo: buildRefundMemo(order, credit.amount, original?.category_name ?? null),
-      });
-    }
-    const invoicesUnparsed =
-      nonDigital.length + refundsNonDigital.length - proposals.length;
+    const result = buildScanResult({
+      matches,
+      orders,
+      transactions,
+      maxDays: settings.maxDays,
+      captures: [...captures, ...invoiceCaptures],
+    });
 
     await setState({
       status: 'done',
-      message: `Found ${String(charges.length)} charges, matched ${String(proposals.length)} transactions.`,
-      proposals,
-      counts: {
-        charges: charges.length,
-        credits: credits.length,
-        digitalSkipped,
-        invoicesUnparsed,
-      },
-      debugCaptures: [...captures, ...invoiceCaptures].slice(0, 3),
-      scanDebug,
-      lastScanAt: new Date().toISOString(),
+      message: result.message,
+      proposals: result.proposals,
+      counts: result.counts,
+      debugCaptures: result.debugCaptures,
+      scanDebug: matches.scanDebug,
+      lastScanAt: now,
     });
   } catch (err) {
     if (err instanceof YnabAuthError) await disconnect();
@@ -174,9 +78,9 @@ export async function runApply(txnIds: string[]): Promise<void> {
     return;
   }
   const state = await getState();
-  const toApply = state.proposals.filter((p) => txnIds.includes(p.txnId));
+  const toApply = selectProposals(state.proposals, txnIds);
 
-  await setState({ status: 'applying', message: `Writing ${String(toApply.length)} memos…` });
+  await setState({ status: 'applying', message: applyStartMessage(toApply.length) });
   const applied: string[] = [...state.appliedTxnIds];
   let failures = 0;
 
@@ -197,12 +101,7 @@ export async function runApply(txnIds: string[]): Promise<void> {
     }
   }
 
-  await setState({
-    status: 'done',
-    message: failures
-      ? `Applied ${String(toApply.length - failures)} memos, ${String(failures)} failed.`
-      : `Applied ${String(toApply.length)} memos.`,
-  });
+  await setState({ status: 'done', message: applySummary(toApply.length, failures) });
 }
 
 export default defineBackground(() => {
