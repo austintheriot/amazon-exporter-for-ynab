@@ -1,15 +1,6 @@
 import { defineConfig } from 'wxt';
 
 export default defineConfig({
-  hooks: {
-    'entrypoints:found': (_wxt, entrypointInfos) => {
-      for (let i = entrypointInfos.length - 1; i >= 0; i--) {
-        if (/\.test\.[cm]?[jt]sx?$/.test(entrypointInfos[i].inputPath)) {
-          entrypointInfos.splice(i, 1);
-        }
-      }
-    },
-  },
   manifest: {
     name: 'Amazon Exporter for YNAB',
     description:

@@ -4,14 +4,14 @@ import {
   legacyInvoiceHtml,
   modernInvoiceHtml,
   unparseableInvoiceHtml,
-} from '../test/fixtures/amazon';
+} from './fixtures/amazon';
 import {
   buildLegacyInvoice,
   buildTransactionsPage,
   createScanWorld,
   ynabTransaction,
-} from '../test/fixtures/scan-world';
-import { runApply, runScan } from './background';
+} from './fixtures/scan-world';
+import { runApply, runScan } from '../entrypoints/background';
 
 const TRANSACTIONS_URL = 'https://www.amazon.com/cpe/yourpayments/transactions';
 const invoiceUrl = (orderId: string) =>
