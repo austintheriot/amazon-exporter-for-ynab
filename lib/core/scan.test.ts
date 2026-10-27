@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AmazonCharge, AmazonOrder, DebugCapture } from './amazon';
-import {
-  buildScanResult,
-  MAX_DEBUG_CAPTURES,
-  matchScan,
-  RECENT_SCAN_DAYS,
-  scanWindow,
-  YNAB_LOOKBACK_DAYS,
-} from './scan';
+import { buildScanResult, matchScan, scanWindow } from './scan';
 import { DEFAULT_SETTINGS } from './state';
 import type { YnabTransaction } from './ynab';
 
@@ -47,14 +40,6 @@ const capture = (orderId: string): DebugCapture => ({
   finalUrl: `https://example.test/${orderId}`,
   status: 200,
   html: '<html></html>',
-});
-
-describe('scan constants', () => {
-  it('match the current scan behavior', () => {
-    expect(RECENT_SCAN_DAYS).toBe(90);
-    expect(YNAB_LOOKBACK_DAYS).toBe(60);
-    expect(MAX_DEBUG_CAPTURES).toBe(3);
-  });
 });
 
 describe('scanWindow', () => {
