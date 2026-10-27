@@ -10,6 +10,19 @@ Amazon transactions land in YNAB as an amount and the payee "Amazon", nothing el
 
 Everything runs client-side in the extension. Your data goes to exactly two places: amazon.com (your existing login session) and api.ynab.com (via OAuth). No backend, no analytics, no third parties.
 
+## How this fork differs
+
+This is a fork of [jparavisini/amazon-exporter-for-ynab](https://github.com/jparavisini/amazon-exporter-for-ynab), branched from upstream release 0.1.1. The matching rules and memo format are the same. The changes are in the popup and in how the code is built and tested.
+
+**Popup:** usability fixes. You can pick which matches to apply, see why a charge did not match, stop a scan or apply mid-run, and use the popup in dark mode or from the keyboard.
+
+Under the hood:
+
+- **Bun, Vitest, and strict tooling.** Bun replaces npm. Vitest with fast-check property tests replaces the smoke script. TypeScript and typescript-eslint run in their strictest modes.
+- **Functional core, imperative shell.** `lib/core` holds pure logic and takes every input as data. Lint rules ban IO there. `lib/shell` and `entrypoints/` do every fetch, storage read, and clock read.
+- **Zod at every boundary.** Stored state, messages, and API responses are parsed before use.
+- **Popup on Lit with The Elm Architecture (TEA).** A pure `update` turns messages into a new model plus effects as data. One runtime interprets the effects through an injected services object. A pure view model feeds light-DOM Lit components that only render and emit messages. The popup bundle no longer includes cheerio (90 KB before, 69 KB now with Lit).
+
 ## How it works
 
 1. Fetches `amazon.com/cpe/yourpayments/transactions` in the background service worker using your existing Amazon login cookies, paginating via the page's widget-form POST. Each entry is an actual card charge or refund credit (one per shipment, so split shipments match correctly) with its order ID.
@@ -19,7 +32,7 @@ Everything runs client-side in the extension. Your data goes to exactly two plac
 
 ## Install
 
-**From a release (no build tools needed):** download the latest `-chrome.zip` from the [Releases page](https://github.com/jparavisini/amazon-exporter-for-ynab/releases), unzip it, open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select the unzipped folder.
+This fork publishes no release builds yet. The zips on the [upstream Releases page](https://github.com/jparavisini/amazon-exporter-for-ynab/releases) are upstream builds and do not contain the changes above. To get this fork, build from source.
 
 **From source:**
 
@@ -28,9 +41,9 @@ bun install
 bun run build
 ```
 
-Then load `.output/chrome-mv3` unpacked the same way.
+Then open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select `.output/chrome-mv3`.
 
-A Chrome Web Store listing is in progress; once live, that becomes the recommended install.
+Upstream has a Chrome Web Store listing in progress. That listing will be the upstream extension, not this fork.
 
 ## Setup
 
@@ -39,7 +52,7 @@ In the popup:
 1. Click "Connect YNAB" and authorize the extension (OAuth; the short-lived access token is stored in the extension's local browser storage and sent only to api.ynab.com).
 2. Pick your budget.
 3. Click "Connect Amazon" to grant the host permission, and make sure you're signed in to amazon.com.
-4. "Scan (dry run)", review the proposed memos and splits, then "Apply".
+4. Click "Scan". Review the proposed memos and splits, uncheck any you do not want, then click "Apply N memos to YNAB".
 
 ### OAuth client (maintainers and forks)
 
@@ -59,7 +72,7 @@ If you fork and change the manifest `key`, your extension ID (and therefore the 
 Install [Bun](https://bun.sh) first. The scripts run WXT, Vitest, and `tsc` on Node, so Node must also be on your path.
 
 - `bun run dev`: WXT dev mode with reload
-- `bun run test`: Vitest suite (`lib/core` unit and property tests)
+- `bun run test`: Vitest suite (`lib/core` unit and property tests, popup runtime and component tests)
 - `bun run lint`: ESLint, including the rules that keep `lib/core` free of IO
 - `bun run typecheck`: TypeScript, strict mode
 - `bun run zip`: build and zip the extension
