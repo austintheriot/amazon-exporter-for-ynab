@@ -2,8 +2,10 @@ import { fc, it } from '@fast-check/vitest';
 import { describe, expect } from 'vitest';
 import {
   chargeArb,
-  dollarsArb,
   orderArb,
+  pricedOrderArb,
+  refundAmountArb,
+  textArb,
   transactionArb,
 } from '../../test/arbitraries';
 import {
@@ -98,7 +100,10 @@ describe.each(matchers)('$name properties', ({ match, sign }) => {
 });
 
 describe('buildSplits properties', () => {
-  it.prop([orderArb, fc.integer({ min: -1, max: 1 })])(
+  it.prop([
+    fc.oneof(pricedOrderArb, pricedOrderArb, orderArb),
+    fc.integer({ min: -1, max: 1 }),
+  ])(
     'sums to the charge in milliunits whenever it returns splits',
     (order, centsOffset) => {
       const chargeAmount = Math.max(
@@ -127,12 +132,13 @@ describe('memo properties', () => {
   );
 
   it.prop([
-    orderArb,
-    dollarsArb,
-    fc.option(fc.string({ minLength: 1, maxLength: 200 }), { nil: null }),
+    orderArb.chain((order) =>
+      fc.tuple(fc.constant(order), refundAmountArb(order)),
+    ),
+    fc.option(textArb, { nil: null }),
   ])(
     'buildRefundMemo stays within the memo limit and ends with the order ID',
-    (order, refundAmount, category) => {
+    ([order, refundAmount], category) => {
       const memo = buildRefundMemo(order, refundAmount, category);
       expect(memo.length).toBeLessThanOrEqual(MEMO_MAX_LENGTH);
       expect(memo.endsWith(`[${order.id}]`)).toBe(true);

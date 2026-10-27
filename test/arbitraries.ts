@@ -60,22 +60,56 @@ export const transactionArb: fc.Arbitrary<YnabTransaction> = fc.record({
   category_name: fc.constant(null),
 });
 
-const itemArb: fc.Arbitrary<AmazonItem> = fc.record({
-  name: fc.string({ minLength: 1, maxLength: 300 }),
-  price: fc.option(dollarsArb, { nil: null }),
-});
+export const textArb: fc.Arbitrary<string> = fc.oneof(
+  fc.string({ minLength: 1, maxLength: 60 }),
+  fc.string({ minLength: 200, maxLength: 600 }),
+);
 
-export const orderArb: fc.Arbitrary<AmazonOrder> = fc
-  .record({
-    id: orderIdArb,
-    date: isoDateArb,
-    items: fc.array(itemArb, { minLength: 1, maxLength: 6 }),
-    extraCents: fc.integer({ min: 0, max: 2_000 }),
-  })
-  .map(({ id, date, items, extraCents }) => {
-    const itemCents = items.reduce(
-      (sum, item) => sum + Math.round((item.price ?? 0) * 100),
-      0,
-    );
-    return { id, date, items, total: (itemCents + extraCents) / 100 };
-  });
+const itemArbWith = (
+  price: fc.Arbitrary<number | null>,
+): fc.Arbitrary<AmazonItem> => fc.record({ name: textArb, price });
+
+const orderArbWith = (
+  items: fc.Arbitrary<AmazonItem[]>,
+): fc.Arbitrary<AmazonOrder> =>
+  fc
+    .record({
+      id: orderIdArb,
+      date: isoDateArb,
+      items,
+      extraCents: fc.integer({ min: 0, max: 2_000 }),
+    })
+    .map(({ id, date, items: orderItems, extraCents }) => {
+      const itemCents = orderItems.reduce(
+        (sum, item) => sum + Math.round((item.price ?? 0) * 100),
+        0,
+      );
+      return {
+        id,
+        date,
+        items: orderItems,
+        total: (itemCents + extraCents) / 100,
+      };
+    });
+
+export const orderArb: fc.Arbitrary<AmazonOrder> = orderArbWith(
+  fc.array(itemArbWith(fc.option(dollarsArb, { nil: null })), {
+    minLength: 1,
+    maxLength: 6,
+  }),
+);
+
+export const pricedOrderArb: fc.Arbitrary<AmazonOrder> = orderArbWith(
+  fc.array(itemArbWith(dollarsArb), { minLength: 2, maxLength: 6 }),
+);
+
+export const refundAmountArb = (order: AmazonOrder): fc.Arbitrary<number> => {
+  const prices = order.items.flatMap((item) =>
+    item.price === null ? [] : [item.price],
+  );
+  return fc.oneof(
+    fc.constant(order.total),
+    ...(prices.length > 0 ? [fc.constantFrom(...prices)] : []),
+    dollarsArb,
+  );
+};
