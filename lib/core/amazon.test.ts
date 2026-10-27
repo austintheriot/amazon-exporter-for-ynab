@@ -2,6 +2,7 @@ import { load } from 'cheerio/slim';
 import { describe, expect, it } from 'vitest';
 import {
   buildNextPageBody,
+  DEBUG_HTML_MAX,
   isOrderNotFoundPage,
   isSignInPage,
   parseInvoice,
@@ -173,5 +174,11 @@ describe('isOrderNotFoundPage', () => {
   });
   it('false for an invoice page', () => {
     expect(isOrderNotFoundPage(load(modernInvoiceHtml))).toBe(false);
+  });
+});
+
+describe('debug capture size', () => {
+  it('caps captured HTML at 500000 characters', () => {
+    expect(DEBUG_HTML_MAX).toBe(500_000);
   });
 });

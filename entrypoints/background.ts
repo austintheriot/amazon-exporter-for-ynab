@@ -12,7 +12,7 @@ import { disconnect, getAccessToken } from '@/lib/shell/oauth';
 import { getSettings, getState, setState } from '@/lib/shell/storage';
 import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
-export async function runScan(): Promise<void> {
+async function runScan(): Promise<void> {
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken || !settings.budgetId) {
@@ -70,7 +70,7 @@ export async function runScan(): Promise<void> {
   }
 }
 
-export async function runApply(txnIds: string[]): Promise<void> {
+async function runApply(txnIds: string[]): Promise<void> {
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken) {

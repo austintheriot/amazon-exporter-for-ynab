@@ -24,8 +24,8 @@ Everything runs client-side in the extension. Your data goes to exactly two plac
 **From source:**
 
 ```bash
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 Then load `.output/chrome-mv3` unpacked the same way.
@@ -50,18 +50,24 @@ The extension authenticates with YNAB via the OAuth implicit grant, so it needs 
 
 If you fork and change the manifest `key`, your extension ID — and therefore the redirect URI you must register — changes with it. New YNAB OAuth applications start in restricted mode (25 users); see the [YNAB API docs](https://api.ynab.com/) for the review process.
 
-**Chrome Web Store builds:** `npm run zip:store` builds a zip without the manifest `key` — the store rejects manifests that contain one and assigns its own extension ID. After the first store upload, add that ID's redirect URI (`https://<store-extension-id>.chromiumapp.org/`) to the YNAB OAuth application alongside the unpacked one. Store listing copy and permission justifications live in [docs/store-listing.md](docs/store-listing.md).
+**Chrome Web Store builds:** `bun run zip:store` builds a zip without the manifest `key` — the store rejects manifests that contain one and assigns its own extension ID. After the first store upload, add that ID's redirect URI (`https://<store-extension-id>.chromiumapp.org/`) to the YNAB OAuth application alongside the unpacked one. Store listing copy and permission justifications live in [docs/store-listing.md](docs/store-listing.md).
 
 **Releases:** pushing a `v*` tag builds the zip in CI and attaches it to a GitHub Release.
 
 ## Development
 
-- `npm run dev` — WXT dev mode with reload
-- `npm run smoke` — parser/matcher tests against synthetic fixtures
-- `npm run typecheck` — TypeScript, strict mode
-- `npx tsx scripts/parse-captures.ts <debug.json>` — run the invoice parser against real captured pages from the popup's debug export
+Install [Bun](https://bun.sh) first. The scripts run WXT, Vitest, and `tsc` on Node, so Node must also be on your path.
 
-The fragile piece is `parseInvoice` in `lib/core/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors/regexes there; the smoke test fixtures in `scripts/smoke.ts` are the place to pin the behavior.
+- `bun run dev`: WXT dev mode with reload
+- `bun run test`: Vitest suite (`lib/core` unit and property tests)
+- `bun run lint`: ESLint, including the rules that keep `lib/core` free of IO
+- `bun run typecheck`: TypeScript, strict mode
+- `bun run zip`: build and zip the extension
+- `bun scripts/parse-captures.ts <debug.json>`: run the invoice parser against real captured pages from the popup's debug export
+
+`lib/core` holds the pure logic. It takes fetched pages, YNAB data, settings, and the date as plain data, and it returns proposals and messages as data. `lib/shell` and `entrypoints/` do every fetch, storage access, and clock read.
+
+The fragile piece is `parseInvoice` in `lib/core/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors and regexes there. The fixtures and tests in `lib/core/amazon.test.ts` are the place to pin the behavior.
 
 ## Privacy
 
