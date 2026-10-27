@@ -46,7 +46,7 @@ In the popup:
 The extension authenticates with YNAB via the OAuth implicit grant, so it needs a registered OAuth application:
 
 1. Register one at YNAB → Account Settings → Developer Settings → New OAuth Application, with redirect URI `https://obinghobhinimagmkihogflcieggmcgk.chromiumapp.org/`. That URI is stable because the extension ID is pinned by the `key` in `wxt.config.ts` — every unpacked install shares it.
-2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
+2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/shell/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
 
 If you fork and change the manifest `key`, your extension ID — and therefore the redirect URI you must register — changes with it. New YNAB OAuth applications start in restricted mode (25 users); see the [YNAB API docs](https://api.ynab.com/) for the review process.
 
@@ -61,7 +61,7 @@ If you fork and change the manifest `key`, your extension ID — and therefore t
 - `npm run typecheck` — TypeScript, strict mode
 - `npx tsx scripts/parse-captures.ts <debug.json>` — run the invoice parser against real captured pages from the popup's debug export
 
-The fragile piece is `parseInvoice` in `lib/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors/regexes there; the smoke test fixtures in `scripts/smoke.ts` are the place to pin the behavior.
+The fragile piece is `parseInvoice` in `lib/core/amazon.ts`: Amazon's invoice markup varies and changes. If parsing breaks, export the debug data from the popup (it includes the raw HTML of unparseable pages) and adjust the selectors/regexes there; the smoke test fixtures in `scripts/smoke.ts` are the place to pin the behavior.
 
 ## Privacy
 

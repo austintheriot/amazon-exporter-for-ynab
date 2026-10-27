@@ -1,18 +1,17 @@
 import { load, type CheerioAPI } from 'cheerio/slim';
 
-const TRANSACTIONS_URL = 'https://www.amazon.com/cpe/yourpayments/transactions';
-const ORDER_DETAILS_URL = 'https://www.amazon.com/gp/css/summary/print.html';
-const FETCH_TIMEOUT_MS = 10_000;
-const DETAIL_CONCURRENCY = 4;
-const MAX_TRANSACTION_PAGES = 25;
+export const TRANSACTIONS_URL =
+  'https://www.amazon.com/cpe/yourpayments/transactions';
+export const ORDER_DETAILS_URL =
+  'https://www.amazon.com/gp/css/summary/print.html';
+export const MAX_TRANSACTION_PAGES = 25;
+export const DEBUG_HTML_MAX = 500_000;
 
 export const AMAZON_ORIGINS = [
   'https://www.amazon.com/*',
   'https://amazon.com/*',
 ];
 export const AMAZON_LOGIN_URL = 'https://www.amazon.com/orders';
-
-export class AmazonSessionError extends Error {}
 
 /** A card charge from the Your Payments → Transactions page. One order can
  * produce several charges (split shipments); amounts are what actually hit
@@ -59,44 +58,19 @@ export interface DebugCapture {
   html: string;
 }
 
-interface FetchedPage {
-  text: string;
-  finalUrl: string;
-  status: number;
-}
-
-async function fetchPage(url: string, init?: RequestInit): Promise<FetchedPage> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      ...init,
-      credentials: 'include',
-      signal: controller.signal,
-    });
-    if (res.status === 401 || res.status === 403) {
-      throw new AmazonSessionError('Amazon session expired');
-    }
-    if (res.status !== 200) {
-      throw new Error(`Amazon returned status ${res.status}`);
-    }
-    return { text: await res.text(), finalUrl: res.url, status: res.status };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function validateSession($: CheerioAPI): void {
-  if ($('h1:contains("Sign in")').length > 0) {
-    throw new AmazonSessionError('Sign in to Amazon required');
-  }
-}
-
 const LONG_DATE_PATTERN = /([A-Za-z]+ \d{1,2}, \d{4})/;
 
 function toIsoDate(longDate: string): string | null {
   const parsed = new Date(`${longDate} 12:00:00 UTC`);
   return isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+export function isSignInPage($: CheerioAPI): boolean {
+  return $('h1:contains("Sign in")').length > 0;
+}
+
+export function isOrderNotFoundPage($: CheerioAPI): boolean {
+  return $('h2:contains("We\'re sorry!")').length > 0;
 }
 
 // --- Transactions page ---
@@ -211,74 +185,6 @@ export function buildNextPageBody($: CheerioAPI): string | null {
   return params.toString();
 }
 
-export interface FetchChargesOptions {
-  /** Stop paginating once charges are older than this ISO date */
-  sinceDate: string;
-  /** Only keep charges on or before this ISO date */
-  untilDate?: string;
-  limit: number;
-  onProgress?: (message: string) => void;
-}
-
-export async function fetchAmazonCharges({
-  sinceDate,
-  untilDate,
-  limit,
-  onProgress,
-}: FetchChargesOptions): Promise<{
-  charges: AmazonCharge[];
-  credits: AmazonCharge[];
-  captures: DebugCapture[];
-}> {
-  const all: AmazonCharge[] = [];
-  const allCredits: AmazonCharge[] = [];
-  const captures: DebugCapture[] = [];
-  let postBody: string | null = null;
-
-  for (let page = 1; page <= MAX_TRANSACTION_PAGES; page++) {
-    onProgress?.(`Fetching Amazon transactions page ${page}…`);
-    const fetched = await fetchPage(
-      TRANSACTIONS_URL,
-      postBody === null
-        ? undefined
-        : {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: postBody,
-          },
-    );
-    const $ = load(fetched.text);
-    validateSession($);
-
-    const parsed = parseTransactionsPage($);
-    if (parsed.charges.length === 0 && parsed.credits.length === 0 && page === 1) {
-      captures.push({
-        orderId: '(transactions page)',
-        requestedUrl: TRANSACTIONS_URL,
-        finalUrl: fetched.finalUrl,
-        status: fetched.status,
-        html: fetched.text.slice(0, 500_000),
-      });
-      break;
-    }
-    all.push(...parsed.charges);
-    allCredits.push(...parsed.credits);
-
-    const pastCutoff = [...parsed.charges, ...parsed.credits].some(
-      (c) => c.date < sinceDate,
-    );
-    if (pastCutoff || all.length >= limit) break;
-    postBody = buildNextPageBody($);
-    if (!postBody) break;
-  }
-
-  const inWindow = (c: AmazonCharge) =>
-    c.date >= sinceDate && (!untilDate || c.date <= untilDate);
-  const charges = all.filter(inWindow).slice(0, limit);
-  const credits = allCredits.filter(inWindow);
-  return { charges, credits, captures };
-}
-
 // --- Order invoice (item names for the memo) ---
 
 /** Parse the invoice / Order Details page into a structured order. Handles
@@ -347,67 +253,4 @@ export function parseInvoice(html: string, orderId: string): AmazonOrder | null 
   if (items.length === 0) return null;
 
   return { id: orderId, date, total, items };
-}
-
-async function fetchInvoice(
-  orderId: string,
-): Promise<{ order: AmazonOrder | null; capture: DebugCapture | null }> {
-  const requestedUrl = `${ORDER_DETAILS_URL}?orderID=${orderId}`;
-  const page = await fetchPage(requestedUrl);
-  const $ = load(page.text);
-  const order =
-    $('h2:contains("We\'re sorry!")').length > 0
-      ? null
-      : parseInvoice(page.text, orderId);
-  const capture: DebugCapture | null = order
-    ? null
-    : {
-        orderId,
-        requestedUrl,
-        finalUrl: page.finalUrl,
-        status: page.status,
-        html: page.text.slice(0, 500_000),
-      };
-  return { order, capture };
-}
-
-async function mapWithConcurrency<T, R>(
-  inputs: T[],
-  limit: number,
-  fn: (input: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(inputs.length);
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.min(limit, inputs.length) },
-    async () => {
-      while (next < inputs.length) {
-        const i = next++;
-        results[i] = await fn(inputs[i]);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
-
-/** Fetch and parse invoices for the given order IDs. Returns a map of
- * orderId → order (absent when unparseable) plus debug captures for
- * failures. */
-export async function fetchOrderDetails(
-  orderIds: string[],
-  onProgress?: (message: string) => void,
-): Promise<{ orders: Map<string, AmazonOrder>; captures: DebugCapture[] }> {
-  const unique = [...new Set(orderIds)];
-  onProgress?.(`Fetching ${unique.length} order invoices…`);
-  const results = await mapWithConcurrency(unique, DETAIL_CONCURRENCY, (id) =>
-    fetchInvoice(id).catch(() => ({ order: null, capture: null })),
-  );
-  const orders = new Map<string, AmazonOrder>();
-  const captures: DebugCapture[] = [];
-  for (const r of results) {
-    if (r.order) orders.set(r.order.id, r.order);
-    else if (r.capture) captures.push(r.capture);
-  }
-  return { orders, captures };
 }

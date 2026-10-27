@@ -1,7 +1,7 @@
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { vi } from 'vitest';
-import type { Settings, SyncState } from '@/lib/state';
-import type { YnabTransaction } from '@/lib/ynab';
+import type { Settings, SyncState } from '@/lib/core/state';
+import type { YnabTransaction } from '@/lib/core/ynab';
 
 const TRANSACTIONS_URL = 'https://www.amazon.com/cpe/yourpayments/transactions';
 const INVOICE_URL = 'https://www.amazon.com/gp/css/summary/print.html';

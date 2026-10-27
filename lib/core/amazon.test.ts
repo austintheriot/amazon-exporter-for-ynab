@@ -2,6 +2,8 @@ import { load } from 'cheerio/slim';
 import { describe, expect, it } from 'vitest';
 import {
   buildNextPageBody,
+  isOrderNotFoundPage,
+  isSignInPage,
   parseInvoice,
   parseTransactionsPage,
 } from './amazon';
@@ -15,7 +17,7 @@ import {
   thousandsMarkupHtml,
   transactionsHtml,
   unparseableInvoiceHtml,
-} from '../test/fixtures/amazon';
+} from '../../test/fixtures/amazon';
 
 describe('parseTransactionsPage (markup)', () => {
   const $txn = load(transactionsHtml);
@@ -153,5 +155,23 @@ describe('thousands separators', () => {
     expect(markupCharge?.amount).toBe(1234.56);
     expect(jsonCharge?.amount).toBe(1234.56);
     expect(order?.total).toBe(1234.56);
+  });
+});
+
+describe('isSignInPage', () => {
+  it('true for a sign-in heading', () => {
+    expect(isSignInPage(load('<h1>Sign in</h1>'))).toBe(true);
+  });
+  it('false for the transactions page', () => {
+    expect(isSignInPage(load(transactionsHtml))).toBe(false);
+  });
+});
+
+describe('isOrderNotFoundPage', () => {
+  it("true for the \"We're sorry!\" heading", () => {
+    expect(isOrderNotFoundPage(load("<h2>We're sorry!</h2>"))).toBe(true);
+  });
+  it('false for an invoice page', () => {
+    expect(isOrderNotFoundPage(load(modernInvoiceHtml))).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 /* Run parseInvoice against real captured pages:
  *   bun scripts/parse-captures.ts ~/Downloads/ynab-amazon-debug.json */
 import { readFileSync } from 'node:fs';
-import { parseInvoice } from '../lib/amazon';
+import { parseInvoice } from '../lib/core/amazon';
 
 const file = process.argv[2];
 if (!file) {

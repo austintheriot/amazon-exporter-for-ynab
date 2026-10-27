@@ -1,19 +1,15 @@
-import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/amazon';
+import { AMAZON_LOGIN_URL, AMAZON_ORIGINS } from '@/lib/core/amazon';
 import {
   authorize,
   disconnect,
   getAccessToken,
   isConnected,
   oauthConfigured,
-} from '@/lib/oauth';
-import {
-  getSettings,
-  getState,
-  saveSettings,
-  type Settings,
-  type SyncState,
-} from '@/lib/state';
-import { getBudgets, type YnabBudget } from '@/lib/ynab';
+} from '@/lib/shell/oauth';
+import type { Settings, SyncState } from '@/lib/core/state';
+import type { YnabBudget } from '@/lib/core/ynab';
+import { getSettings, getState, saveSettings } from '@/lib/shell/storage';
+import { getBudgets } from '@/lib/shell/ynab';
 
 const PRIVACY_URL =
   'https://github.com/jparavisini/amazon-exporter-for-ynab/blob/main/PRIVACY.md';

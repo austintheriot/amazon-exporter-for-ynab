@@ -1,8 +1,4 @@
-import {
-  AmazonSessionError,
-  fetchAmazonCharges,
-  fetchOrderDetails,
-} from '@/lib/amazon';
+import { AmazonSessionError, YnabAuthError } from '@/lib/core/errors';
 import {
   buildMemo,
   buildRefundMemo,
@@ -11,19 +7,12 @@ import {
   matchCharges,
   matchRefunds,
   type MatchProposal,
-} from '@/lib/matcher';
-import {
-  getSettings,
-  getState,
-  setState,
-  type Message,
-} from '@/lib/state';
-import { disconnect, getAccessToken } from '@/lib/oauth';
-import {
-  getTransactions,
-  updateTransactionMemo,
-  YnabAuthError,
-} from '@/lib/ynab';
+} from '@/lib/core/matcher';
+import type { Message } from '@/lib/core/state';
+import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
+import { disconnect, getAccessToken } from '@/lib/shell/oauth';
+import { getSettings, getState, setState } from '@/lib/shell/storage';
+import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
 const RECONNECT_MESSAGE = 'YNAB session expired. Reconnect YNAB in the popup.';
 
