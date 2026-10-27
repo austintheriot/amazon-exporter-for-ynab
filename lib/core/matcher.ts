@@ -1,4 +1,4 @@
-import type { AmazonCharge, AmazonOrder } from './amazon';
+import type { AmazonCharge, AmazonItem, AmazonOrder } from './amazon';
 import {
   dollarsToOutflowMilliunits,
   type YnabSplit,
@@ -21,7 +21,7 @@ export interface MatchProposal {
   txnPayee: string;
   memo: string;
   /** When present, applying also turns the transaction into a split */
-  splits?: YnabSplit[];
+  splits?: YnabSplit[] | undefined;
 }
 
 export interface ChargeMatch {
@@ -64,15 +64,20 @@ export function buildRefundMemo(
         refundAmount >= i.price - 0.01 &&
         refundAmount <= i.price * (1 + MAX_TAX_RATE) + 0.02,
     );
+    const [onlyPriced] = priced;
     body =
-      priced.length === 1
-        ? `Refund: ${priced[0].name}`
+      priced.length === 1 && onlyPriced
+        ? `Refund: ${onlyPriced.name}`
         : `Partial refund of $${order.total.toFixed(2)} order: ${names.join(', ')}`;
   }
   if (originalCategory) {
     body += ` → was: ${originalCategory}`;
   }
   return withOrderId(body, order.id);
+}
+
+function hasPrice(item: AmazonItem): item is AmazonItem & { price: number } {
+  return item.price !== null;
 }
 
 /** Per-item splits for a charge, plus a tax/shipping remainder. Only when the
@@ -84,10 +89,11 @@ export function buildSplits(
 ): YnabSplit[] | null {
   if (order.items.length < 2) return null;
   if (Math.abs(chargeAmount - order.total) > 0.01) return null;
-  if (order.items.some((i) => i.price === null)) return null;
+  const pricedItems = order.items.filter(hasPrice);
+  if (pricedItems.length !== order.items.length) return null;
 
-  const splits: YnabSplit[] = order.items.map((i) => ({
-    amount: dollarsToOutflowMilliunits(i.price!),
+  const splits: YnabSplit[] = pricedItems.map((i) => ({
+    amount: dollarsToOutflowMilliunits(i.price),
     memo: i.name.length > MEMO_MAX_LENGTH ? i.name.slice(0, MEMO_MAX_LENGTH) : i.name,
   }));
   const remainder =

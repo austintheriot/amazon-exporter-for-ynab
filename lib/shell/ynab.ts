@@ -10,7 +10,7 @@ const BASE_URL = 'https://api.ynab.com/v1';
 async function request<T>(
   accessToken: string,
   path: string,
-  init?: RequestInit,
+  init?: Omit<RequestInit, 'headers'> & { headers?: Record<string, string> },
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -24,7 +24,7 @@ async function request<T>(
     throw new YnabAuthError('YNAB token rejected (401)');
   }
   if (!res.ok) {
-    throw new Error(`YNAB API error ${res.status}: ${await res.text()}`);
+    throw new Error(`YNAB API error ${String(res.status)}: ${await res.text()}`);
   }
   const body = (await res.json()) as { data: T };
   return body.data;

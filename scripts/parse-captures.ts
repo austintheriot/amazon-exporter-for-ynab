@@ -9,17 +9,18 @@ if (!file) {
   process.exit(1);
 }
 
-const captures: { orderId: string; html: string }[] = JSON.parse(
-  readFileSync(file, 'utf8'),
-);
+const captures = JSON.parse(readFileSync(file, 'utf8')) as {
+  orderId: string;
+  html: string;
+}[];
 
 let failures = 0;
 for (const c of captures) {
   const order = parseInvoice(c.html, c.orderId);
   if (order) {
     console.log(
-      `ok   ${c.orderId}: ${order.date} $${order.total} — ${order.items
-        .map((i) => `${i.name.slice(0, 50)}${i.price !== null ? ` ($${i.price})` : ''}`)
+      `ok   ${c.orderId}: ${order.date} $${String(order.total)} — ${order.items
+        .map((i) => `${i.name.slice(0, 50)}${i.price !== null ? ` ($${String(i.price)})` : ''}`)
         .join(' | ')}`,
     );
   } else {

@@ -14,7 +14,7 @@ import { getBudgets } from '@/lib/shell/ynab';
 const PRIVACY_URL =
   'https://github.com/jparavisini/amazon-exporter-for-ynab/blob/main/PRIVACY.md';
 
-const app = document.getElementById('app')!;
+const app = requireElement('app');
 
 let settings: Settings;
 let state: SyncState;
@@ -22,6 +22,18 @@ let budgets: YnabBudget[] = [];
 let ynabConnected = false;
 let amazonGranted = false;
 let budgetError = '';
+
+function requireElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Popup markup has no #${id} element`);
+  return element;
+}
+
+function runAsync(handler: () => Promise<void>): () => void {
+  return () => {
+    void handler();
+  };
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -60,7 +72,7 @@ function renderSettings(): HTMLElement {
       className: 'primary',
       textContent: 'Connect YNAB',
     });
-    connectBtn.addEventListener('click', async () => {
+    connectBtn.addEventListener('click', runAsync(async () => {
       const token = await authorize(true);
       if (token) {
         await loadBudgets();
@@ -68,7 +80,7 @@ function renderSettings(): HTMLElement {
         budgetError = 'YNAB authorization failed or was cancelled.';
       }
       render();
-    });
+    }));
     return el('section', {}, [
       el('div', {}, ['Authorize read/write access to your YNAB budget.']),
       connectBtn,
@@ -79,12 +91,12 @@ function renderSettings(): HTMLElement {
   }
 
   const disconnectBtn = el('button', { textContent: 'Disconnect YNAB' });
-  disconnectBtn.addEventListener('click', async () => {
+  disconnectBtn.addEventListener('click', runAsync(async () => {
     await disconnect();
     ynabConnected = false;
     budgets = [];
     render();
-  });
+  }));
 
   const budgetSelect = el('select');
   budgetSelect.append(el('option', { value: '', textContent: 'Select budget…' }));
@@ -106,13 +118,13 @@ function renderSettings(): HTMLElement {
       }),
     );
   }
-  budgetSelect.addEventListener('change', async () => {
+  budgetSelect.addEventListener('change', runAsync(async () => {
     settings.budgetId = budgetSelect.value;
     settings.budgetName =
       budgets.find((b) => b.id === budgetSelect.value)?.name ?? '';
     await saveSettings(settings);
     render();
-  });
+  }));
 
   const currentYear = new Date().getFullYear();
   const yearSelect = el('select');
@@ -128,10 +140,10 @@ function renderSettings(): HTMLElement {
       }),
     );
   }
-  yearSelect.addEventListener('change', async () => {
+  yearSelect.addEventListener('change', runAsync(async () => {
     settings.year = yearSelect.value ? Number(yearSelect.value) : null;
     await saveSettings(settings);
-  });
+  }));
 
   const limitInput = el('input', {
     type: 'number',
@@ -139,13 +151,13 @@ function renderSettings(): HTMLElement {
     max: '200',
     value: String(settings.orderLimit),
   });
-  limitInput.addEventListener('change', async () => {
+  limitInput.addEventListener('change', runAsync(async () => {
     const n = parseInt(limitInput.value, 10);
     if (Number.isFinite(n) && n > 0) {
       settings.orderLimit = Math.min(n, 200);
       await saveSettings(settings);
     }
-  });
+  }));
 
   return el('section', {}, [
     ...(budgetError ? [el('div', { className: 'status error' }, [budgetError])] : []),
@@ -170,7 +182,7 @@ function renderAmazon(): HTMLElement {
     ]);
   }
   const connectBtn = el('button', { className: 'primary', textContent: 'Connect Amazon' });
-  connectBtn.addEventListener('click', async () => {
+  connectBtn.addEventListener('click', runAsync(async () => {
     amazonGranted = await browser.permissions.request({
       origins: AMAZON_ORIGINS,
     });
@@ -178,7 +190,7 @@ function renderAmazon(): HTMLElement {
       await browser.tabs.create({ url: AMAZON_LOGIN_URL });
     }
     render();
-  });
+  }));
   return el('section', {}, [
     el('div', {}, ['Grant access to read your Amazon order history.']),
     connectBtn,
@@ -202,7 +214,7 @@ function renderSync(): HTMLElement {
     (p) => !state.appliedTxnIds.includes(p.txnId),
   );
   const applyBtn = el('button', {
-    textContent: `Apply ${pending.length} memo${pending.length === 1 ? '' : 's'} to YNAB`,
+    textContent: `Apply ${String(pending.length)} memo${pending.length === 1 ? '' : 's'} to YNAB`,
     disabled: busy || pending.length === 0,
   });
   applyBtn.addEventListener('click', () => {
@@ -227,11 +239,11 @@ function renderSync(): HTMLElement {
 
   if (state.counts) {
     const { charges, credits, digitalSkipped, invoicesUnparsed } = state.counts;
-    const parts = [`${charges} card charges found`];
-    if (credits) parts.push(`${credits} refunds found`);
-    if (digitalSkipped) parts.push(`${digitalSkipped} digital orders skipped`);
+    const parts = [`${String(charges)} card charges found`];
+    if (credits) parts.push(`${String(credits)} refunds found`);
+    if (digitalSkipped) parts.push(`${String(digitalSkipped)} digital orders skipped`);
     if (invoicesUnparsed)
-      parts.push(`${invoicesUnparsed} invoices could not be parsed`);
+      parts.push(`${String(invoicesUnparsed)} invoices could not be parsed`);
     children.push(el('div', { className: 'muted' }, [parts.join(' · ')]));
   }
 
@@ -264,7 +276,7 @@ function renderSync(): HTMLElement {
         el('li', { className: applied ? 'applied' : '' }, [
           el('div', { className: 'proposal-body' }, [
             el('div', { className: 'proposal-title' }, [
-              `$${p.orderTotal.toFixed(2)} · ${p.kind === 'refund' ? 'refunded' : 'charged'} ${p.orderDate} → txn ${p.txnDate}${p.splits ? ` · split ×${p.splits.length}` : ''}${applied ? ' · applied ✓' : ''}`,
+              `$${p.orderTotal.toFixed(2)} · ${p.kind === 'refund' ? 'refunded' : 'charged'} ${p.orderDate} → txn ${p.txnDate}${p.splits ? ` · split ×${String(p.splits.length)}` : ''}${applied ? ' · applied ✓' : ''}`,
             ]),
             el('div', { className: 'proposal-memo' }, [p.memo]),
           ]),
@@ -296,14 +308,16 @@ function render(): void {
   );
 }
 
-browser.storage.onChanged.addListener(async (changes, area) => {
-  if (area === 'local' && changes.syncState) {
-    state = await getState();
-    render();
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes['syncState']) {
+    void (async () => {
+      state = await getState();
+      render();
+    })();
   }
 });
 
-(async () => {
+void (async () => {
   [settings, state, amazonGranted, ynabConnected] = await Promise.all([
     getSettings(),
     getState(),

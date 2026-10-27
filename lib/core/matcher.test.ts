@@ -95,14 +95,14 @@ describe('matchCharges', () => {
 describe('buildMemo', () => {
   it('memo truncated', () => {
     const longMemo = buildMemo(
-      Array.from({ length: 60 }, (_, i) => `Item number ${i} with a long name`),
+      Array.from({ length: 60 }, (_, i) => `Item number ${String(i)} with a long name`),
       '111-1234567-7654321',
     );
     expect(longMemo.length).toBeLessThanOrEqual(480);
   });
   it('order id survives truncation', () => {
     const longMemo = buildMemo(
-      Array.from({ length: 60 }, (_, i) => `Item number ${i} with a long name`),
+      Array.from({ length: 60 }, (_, i) => `Item number ${String(i)} with a long name`),
       '111-1234567-7654321',
     );
     expect(longMemo.endsWith(' [111-1234567-7654321]')).toBe(true);

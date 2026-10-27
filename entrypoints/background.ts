@@ -49,9 +49,9 @@ export async function runScan(): Promise<void> {
   try {
     const onProgress = (message: string) => void setState({ message });
     const sinceDate = settings.year
-      ? `${settings.year}-01-01`
+      ? `${String(settings.year)}-01-01`
       : new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
-    const untilDate = settings.year ? `${settings.year}-12-31` : undefined;
+    const untilDate = settings.year ? `${String(settings.year)}-12-31` : undefined;
 
     const { charges, credits, captures } = await fetchAmazonCharges({
       sinceDate,
@@ -148,7 +148,7 @@ export async function runScan(): Promise<void> {
 
     await setState({
       status: 'done',
-      message: `Found ${charges.length} charges, matched ${proposals.length} transactions.`,
+      message: `Found ${String(charges.length)} charges, matched ${String(proposals.length)} transactions.`,
       proposals,
       counts: {
         charges: charges.length,
@@ -176,7 +176,7 @@ export async function runApply(txnIds: string[]): Promise<void> {
   const state = await getState();
   const toApply = state.proposals.filter((p) => txnIds.includes(p.txnId));
 
-  await setState({ status: 'applying', message: `Writing ${toApply.length} memos…` });
+  await setState({ status: 'applying', message: `Writing ${String(toApply.length)} memos…` });
   const applied: string[] = [...state.appliedTxnIds];
   let failures = 0;
 
@@ -200,17 +200,20 @@ export async function runApply(txnIds: string[]): Promise<void> {
   await setState({
     status: 'done',
     message: failures
-      ? `Applied ${toApply.length - failures} memos, ${failures} failed.`
-      : `Applied ${toApply.length} memos.`,
+      ? `Applied ${String(toApply.length - failures)} memos, ${String(failures)} failed.`
+      : `Applied ${String(toApply.length)} memos.`,
   });
 }
 
 export default defineBackground(() => {
   browser.runtime.onMessage.addListener((message: Message) => {
-    if (message.type === 'scan') {
-      void runScan();
-    } else if (message.type === 'apply') {
-      void runApply(message.txnIds);
+    switch (message.type) {
+      case 'scan':
+        void runScan();
+        break;
+      case 'apply':
+        void runApply(message.txnIds);
+        break;
     }
     return false;
   });

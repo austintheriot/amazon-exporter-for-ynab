@@ -26,7 +26,9 @@ interface FetchedPage {
 
 async function fetchPage(url: string, init?: RequestInit): Promise<FetchedPage> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       ...init,
@@ -37,7 +39,7 @@ async function fetchPage(url: string, init?: RequestInit): Promise<FetchedPage> 
       throw new AmazonSessionError('Amazon session expired');
     }
     if (res.status !== 200) {
-      throw new Error(`Amazon returned status ${res.status}`);
+      throw new Error(`Amazon returned status ${String(res.status)}`);
     }
     return { text: await res.text(), finalUrl: res.url, status: res.status };
   } finally {
@@ -49,7 +51,7 @@ export interface FetchChargesOptions {
   /** Stop paginating once charges are older than this ISO date */
   sinceDate: string;
   /** Only keep charges on or before this ISO date */
-  untilDate?: string;
+  untilDate?: string | undefined;
   limit: number;
   onProgress?: (message: string) => void;
 }
@@ -70,7 +72,7 @@ export async function fetchAmazonCharges({
   let postBody: string | null = null;
 
   for (let page = 1; page <= MAX_TRANSACTION_PAGES; page++) {
-    onProgress?.(`Fetching Amazon transactions page ${page}…`);
+    onProgress?.(`Fetching Amazon transactions page ${String(page)}…`);
     const fetched = await fetchPage(
       TRANSACTIONS_URL,
       postBody === null
@@ -141,14 +143,13 @@ async function mapWithConcurrency<T, R>(
   limit: number,
   fn: (input: T) => Promise<R>,
 ): Promise<R[]> {
-  const results: R[] = new Array(inputs.length);
-  let next = 0;
+  const results = new Array<R>(inputs.length);
+  const queue = inputs.entries();
   const workers = Array.from(
     { length: Math.min(limit, inputs.length) },
     async () => {
-      while (next < inputs.length) {
-        const i = next++;
-        results[i] = await fn(inputs[i]);
+      for (const [i, input] of queue) {
+        results[i] = await fn(input);
       }
     },
   );
@@ -164,7 +165,7 @@ export async function fetchOrderDetails(
   onProgress?: (message: string) => void,
 ): Promise<{ orders: Map<string, AmazonOrder>; captures: DebugCapture[] }> {
   const unique = [...new Set(orderIds)];
-  onProgress?.(`Fetching ${unique.length} order invoices…`);
+  onProgress?.(`Fetching ${String(unique.length)} order invoices…`);
   const results = await mapWithConcurrency(unique, DETAIL_CONCURRENCY, (id) =>
     fetchInvoice(id).catch(() => ({ order: null, capture: null })),
   );

@@ -119,10 +119,10 @@ export async function createScanWorld(
   const requests: string[] = [];
   const ynabWrites: YnabWrite[] = [];
 
-  const originalSet = fakeBrowser.storage.local.set.bind(
-    fakeBrowser.storage.local,
-  );
-  vi.spyOn(fakeBrowser.storage.local, 'set').mockImplementation(
+  const localArea: { set(items: Record<string, unknown>): Promise<void> } =
+    fakeBrowser.storage.local;
+  const originalSet = localArea.set.bind(localArea);
+  vi.spyOn(localArea, 'set').mockImplementation(
     async (items) => {
       if ('syncState' in items) {
         stateWrites.push(structuredClone(items['syncState'] as SyncState));
@@ -135,45 +135,52 @@ export async function createScanWorld(
   const ynabTransactionsUrl = `${YNAB_BASE_URL}/budgets/${settings.budgetId}/transactions`;
   const ynabPutPrefix = `${ynabTransactionsUrl}/`;
 
+  const respond = (input: string | URL, init?: RequestInit): Response => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    requests.push(url);
+
+    if (url === TRANSACTIONS_URL) {
+      const page = options.transactionPages[transactionsPageIndex];
+      transactionsPageIndex++;
+      if (page === undefined) throw new Error(`No fake page for ${method} ${url}`);
+      return new Response(page, { status: 200 });
+    }
+    if (url.startsWith(`${INVOICE_URL}?orderID=`)) {
+      const orderId = url.slice(`${INVOICE_URL}?orderID=`.length);
+      const reply = options.invoices?.[orderId];
+      if (reply === undefined) throw new Error(`No fake invoice for ${orderId}`);
+      const { status = 200, body } = toReply(reply);
+      return new Response(body, { status });
+    }
+    if (method === 'GET' && url.startsWith(`${ynabTransactionsUrl}?since_date=`)) {
+      const ynab = options.ynab;
+      if (!ynab) throw new Error(`No fake YNAB data for ${url}`);
+      if (ynab.status && ynab.status !== 200) {
+        return new Response('ynab failure', { status: ynab.status });
+      }
+      return new Response(
+        JSON.stringify({ data: { transactions: ynab.transactions } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
+    if (method === 'PUT' && url.startsWith(ynabPutPrefix)) {
+      const txnId = url.slice(ynabPutPrefix.length);
+      if (typeof init?.body !== 'string') {
+        throw new Error(`No string body for ${method} ${url}`);
+      }
+      ynabWrites.push({ txnId, body: JSON.parse(init.body) });
+      const status = options.putStatuses?.[txnId] ?? 200;
+      return new Response(JSON.stringify({ data: {} }), { status });
+    }
+    throw new Error(`Unexpected request: ${method} ${url}`);
+  };
   vi.stubGlobal(
     'fetch',
-    async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      const method = init?.method ?? 'GET';
-      requests.push(url);
-
-      if (url === TRANSACTIONS_URL) {
-        const page = options.transactionPages[transactionsPageIndex];
-        transactionsPageIndex++;
-        if (page === undefined) throw new Error(`No fake page for ${method} ${url}`);
-        return new Response(page, { status: 200 });
-      }
-      if (url.startsWith(`${INVOICE_URL}?orderID=`)) {
-        const orderId = url.slice(`${INVOICE_URL}?orderID=`.length);
-        const reply = options.invoices?.[orderId];
-        if (reply === undefined) throw new Error(`No fake invoice for ${orderId}`);
-        const { status = 200, body } = toReply(reply);
-        return new Response(body, { status });
-      }
-      if (method === 'GET' && url.startsWith(`${ynabTransactionsUrl}?since_date=`)) {
-        const ynab = options.ynab;
-        if (!ynab) throw new Error(`No fake YNAB data for ${url}`);
-        if (ynab.status && ynab.status !== 200) {
-          return new Response('ynab failure', { status: ynab.status });
-        }
-        return new Response(
-          JSON.stringify({ data: { transactions: ynab.transactions } }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        );
-      }
-      if (method === 'PUT' && url.startsWith(ynabPutPrefix)) {
-        const txnId = url.slice(ynabPutPrefix.length);
-        ynabWrites.push({ txnId, body: JSON.parse(String(init?.body)) });
-        const status = options.putStatuses?.[txnId] ?? 200;
-        return new Response(JSON.stringify({ data: {} }), { status });
-      }
-      throw new Error(`Unexpected request: ${method} ${url}`);
-    },
+    (input: string | URL, init?: RequestInit) =>
+      new Promise<Response>((resolve) => {
+        resolve(respond(input, init));
+      }),
   );
 
   return {

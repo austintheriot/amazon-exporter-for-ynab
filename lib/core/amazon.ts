@@ -87,6 +87,18 @@ export function parseTransactionsPage($: CheerioAPI): {
     : parseTransactionsJson($('script#__NEXT_DATA__').first().text() || '{}');
 }
 
+interface NextDataJson {
+  props?: {
+    pageProps?: {
+      state?: {
+        transactionResponseState?: {
+          visibleTransactionResponse?: { transactionList?: TransactionJson[] };
+        };
+      };
+    };
+  };
+}
+
 interface TransactionJson {
   formattedAmount?: string;
   formattedDate?: string;
@@ -104,8 +116,9 @@ function parseTransactionsJson(nextData: string): {
 } {
   const charges: AmazonCharge[] = [];
   const credits: AmazonCharge[] = [];
-  const list: TransactionJson[] =
-    JSON.parse(nextData)?.props?.pageProps?.state?.transactionResponseState
+  const parsed = JSON.parse(nextData) as NextDataJson | null;
+  const list =
+    parsed?.props?.pageProps?.state?.transactionResponseState
       ?.visibleTransactionResponse?.transactionList ?? [];
   for (const t of list) {
     const amount = t.formattedAmount?.match(/\$([\d,]+\.\d{2})/)?.[1];
@@ -121,7 +134,7 @@ function parseTransactionsJson(nextData: string): {
       orderId,
       date,
       amount: parseFloat(amount.replace(/,/g, '')),
-      paymentMethod: digits ? `${card?.paymentMethodName ?? 'Card'} ****${digits}` : '',
+      paymentMethod: digits ? `${card.paymentMethodName ?? 'Card'} ****${digits}` : '',
     });
   }
   return { charges, credits };
@@ -140,26 +153,27 @@ function parseTransactionsMarkup($: CheerioAPI): {
   ).each((_, el) => {
     const $el = $(el);
     if ($el.hasClass('apx-transaction-date-container')) {
-      const m = $el.text().match(LONG_DATE_PATTERN);
-      if (m) currentDate = toIsoDate(m[1]) ?? currentDate;
+      const dateText = LONG_DATE_PATTERN.exec($el.text())?.[1];
+      if (dateText) currentDate = toIsoDate(dateText) ?? currentDate;
       return;
     }
 
     const text = $el.text().replace(/\s+/g, ' ');
-    const amountMatch = text.match(/(-?)\s*\$([\d,]+\.\d{2})/);
+    const amountMatch = /(-?)\s*\$([\d,]+\.\d{2})/.exec(text);
+    const amountText = amountMatch?.[2];
     // Amazon order IDs are 3-7-7 digit groups ("D01-…" for digital orders).
     const orderId =
-      text.match(/Order\s+#\s*((?:D\d{2}|\d{3})-\d{7}-\d{7})/i)?.[1] ??
+      /Order\s+#\s*((?:D\d{2}|\d{3})-\d{7}-\d{7})/i.exec(text)?.[1] ??
       $el
         .find('a[href*="orderID="]')
         .attr('href')
         ?.match(/orderID=((?:D\d{2}|\d{3})-\d{7}-\d{7})/)?.[1];
-    if (!currentDate || !amountMatch || !orderId) return;
+    if (!currentDate || !amountText || !orderId) return;
     (amountMatch[1] === '-' ? charges : credits).push({
       orderId,
       date: currentDate,
-      amount: parseFloat(amountMatch[2].replace(/,/g, '')),
-      paymentMethod: text.match(/([A-Za-z][A-Za-z ]*\*{3,4}\s?\d{4})/)?.[1] ?? '',
+      amount: parseFloat(amountText.replace(/,/g, '')),
+      paymentMethod: /([A-Za-z][A-Za-z ]*\*{3,4}\s?\d{4})/.exec(text)?.[1] ?? '',
     });
   });
 
@@ -173,6 +187,8 @@ export function buildNextPageBody($: CheerioAPI): string | null {
     'input[name^="ppw-widgetEvent:DefaultNextPageNavigationEvent"]',
   ).first();
   if (eventInput.length === 0) return null;
+  const eventName = eventInput.attr('name');
+  if (eventName === undefined) return null;
   const form = eventInput.closest('form');
   if (form.length === 0) return null;
 
@@ -181,7 +197,7 @@ export function buildNextPageBody($: CheerioAPI): string | null {
     const name = $(el).attr('name');
     if (name) params.append(name, $(el).attr('value') ?? '');
   });
-  params.append(eventInput.attr('name')!, eventInput.attr('value') ?? '');
+  params.append(eventName, eventInput.attr('value') ?? '');
   return params.toString();
 }
 
@@ -194,22 +210,16 @@ export function parseInvoice(html: string, orderId: string): AmazonOrder | null 
   const $ = load(html);
   const text = $('body').text().replace(/\s+/g, ' ');
 
-  let dateText = $('[data-component="orderDate"]')
-    .first()
-    .text()
-    .match(LONG_DATE_PATTERN)?.[1];
-  if (!dateText) {
-    dateText = text.match(
-      new RegExp(`Order [Pp]laced:?\\s*${LONG_DATE_PATTERN.source}`),
-    )?.[1];
-  }
+  const dateText =
+    LONG_DATE_PATTERN.exec($('[data-component="orderDate"]').first().text())?.[1] ??
+    new RegExp(`Order [Pp]laced:?\\s*${LONG_DATE_PATTERN.source}`).exec(text)?.[1];
   if (!dateText) return null;
   const date = toIsoDate(dateText);
   if (!date) return null;
 
-  const totalMatch = text.match(/Grand Total:\s*\$([\d,]+\.\d{2})/);
-  if (!totalMatch) return null;
-  const total = parseFloat(totalMatch[1].replace(/,/g, ''));
+  const totalText = /Grand Total:\s*\$([\d,]+\.\d{2})/.exec(text)?.[1];
+  if (!totalText) return null;
+  const total = parseFloat(totalText.replace(/,/g, ''));
   if (!Number.isFinite(total) || total < 0) return null;
 
   const items: AmazonItem[] = [];
@@ -222,33 +232,33 @@ export function parseInvoice(html: string, orderId: string): AmazonOrder | null 
     }
   };
   const parsePrice = (raw: string): number | null => {
-    const m = raw.match(/\$([\d,]+\.\d{2})/);
-    return m ? parseFloat(m[1].replace(/,/g, '')) : null;
+    const priceText = /\$([\d,]+\.\d{2})/.exec(raw)?.[1];
+    return priceText ? parseFloat(priceText.replace(/,/g, '')) : null;
   };
   // Modern page: one data-component="itemTitle" per line item; unitPrice
   // components pair up by index when both lists are the same length.
   const titles = $('[data-component="itemTitle"]');
   const prices = $('[data-component="unitPrice"]');
-  titles.each((i, el) =>
+  titles.each((i, el) => {
     pushItem(
       $(el).text(),
       titles.length === prices.length ? parsePrice($(prices[i]).text()) : null,
-    ),
-  );
+    );
+  });
   // Legacy print page: italicized titles in the Items Ordered table, price in
   // the row's last cell.
   if (items.length === 0) {
-    $('td i').each((_, el) =>
+    $('td i').each((_, el) => {
       pushItem(
         $(el).text(),
         parsePrice($(el).closest('tr').find('td').last().text()),
-      ),
-    );
+      );
+    });
   }
   if (items.length === 0) {
-    $('a[href*="/gp/product/"], a[href*="/dp/"]').each((_, el) =>
-      pushItem($(el).text()),
-    );
+    $('a[href*="/gp/product/"], a[href*="/dp/"]').each((_, el) => {
+      pushItem($(el).text());
+    });
   }
   if (items.length === 0) return null;
 

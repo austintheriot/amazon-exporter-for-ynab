@@ -306,8 +306,8 @@ describe('runScan debug captures', () => {
       transactionPages: [
         buildTransactionsPage(
           orderIds.map((orderId, index) => ({
-            date: `June ${20 - index}, 2026`,
-            amount: `-$${index + 1}.00`,
+            date: `June ${String(20 - index)}, 2026`,
+            amount: `-$${String(index + 1)}.00`,
             orderId,
           })),
         ),
@@ -322,7 +322,7 @@ describe('runScan debug captures', () => {
         transactions: orderIds.map((orderId, index) =>
           ynabTransaction({
             id: `txn-${orderId}`,
-            date: `2026-06-${20 - index}`,
+            date: `2026-06-${String(20 - index)}`,
             amount: -(index + 1) * 1000,
           }),
         ),
@@ -430,7 +430,7 @@ describe('runApply', () => {
     await runScan();
     world.stateWrites.length = 0;
     world.ynabWrites.length = 0;
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     await runApply(['txn-r', 'txn-a']);
 
