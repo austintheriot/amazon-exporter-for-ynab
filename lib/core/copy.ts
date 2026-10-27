@@ -89,3 +89,7 @@ export function unmatchedReasonText(reason: UnmatchedReason): string {
         : 'No Amazon YNAB transaction for this amount.';
   }
 }
+
+export const CONNECT_AMAZON_FIRST = 'Connect Amazon first.';
+export const ORDER_LIMIT_MAX_HINT = 'Max 200';
+export const ORDER_LIMIT_INVALID_HINT = 'Enter a number from 1 to 200';
