@@ -32,7 +32,9 @@ Under the hood:
 
 ## Install
 
-This fork publishes no release builds yet. The zips on the [upstream Releases page](https://github.com/jparavisini/amazon-exporter-for-ynab/releases) are upstream builds and do not contain the changes above. To get this fork, build from source.
+**From a release (no build tools needed):** download the latest `-chrome.zip` from the [Releases page](https://github.com/austintheriot/amazon-exporter-for-ynab/releases), unzip it, open `chrome://extensions`, enable Developer mode, click "Load unpacked", and select the unzipped folder. The zips on the upstream Releases page are upstream builds and do not contain this fork's changes.
+
+To check that a zip came from this repo's release workflow, run `gh attestation verify <zip> --repo austintheriot/amazon-exporter-for-ynab`, or compare `sha256sum <zip>` with the release's `SHA256SUMS` file.
 
 **From source:**
 
@@ -65,7 +67,7 @@ If you fork and change the manifest `key`, your extension ID (and therefore the 
 
 **Chrome Web Store builds:** `bun run zip:store` builds a zip without the manifest `key`: the store rejects manifests that contain one and assigns its own extension ID. After the first store upload, add that ID's redirect URI (`https://<store-extension-id>.chromiumapp.org/`) to the YNAB OAuth application alongside the unpacked one. Store listing copy and permission justifications live in [docs/store-listing.md](docs/store-listing.md).
 
-**Releases:** pushing a `v*` tag builds the zip in CI and attaches it to a GitHub Release.
+**Releases:** push a `vX.Y.Z` tag on a `main` commit whose `package.json` version is `X.Y.Z` (`git push --atomic origin main vX.Y.Z`). The release workflow refuses any other tag, builds and verifies the zip in a read-only job, then waits for an owner approval in the `release` environment before it publishes the zip, its provenance attestation, and `SHA256SUMS`.
 
 ## Development
 
