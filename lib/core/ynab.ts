@@ -62,6 +62,16 @@ export interface YnabSplit {
   memo: string;
 }
 
+export interface MemoUpdateBody {
+  transaction: { memo: string; subtransactions?: YnabSplit[] };
+}
+
+export function buildMemoUpdateBody(memo: string, splits: YnabSplit[] | undefined): MemoUpdateBody {
+  return {
+    transaction: splits?.length ? { memo, subtransactions: splits } : { memo },
+  };
+}
+
 /** Convert a positive dollar amount to YNAB outflow milliunits (negative). */
 export function dollarsToOutflowMilliunits(dollars: number): number {
   return -Math.round(dollars * 1000);

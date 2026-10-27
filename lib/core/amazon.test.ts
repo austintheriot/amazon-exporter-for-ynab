@@ -1,8 +1,10 @@
 import { load } from 'cheerio/slim';
 import { describe, expect, it } from 'vitest';
 import {
+  buildDebugCapture,
   buildNextPageBody,
   DEBUG_HTML_MAX,
+  TRANSACTIONS_URL,
   isOrderNotFoundPage,
   isSignInPage,
   parseInvoice,
@@ -177,8 +179,63 @@ describe('isOrderNotFoundPage', () => {
   });
 });
 
-describe('debug capture size', () => {
-  it('caps captured HTML at 500000 characters', () => {
-    expect(DEBUG_HTML_MAX).toBe(500_000);
+describe('buildDebugCapture', () => {
+  const response = { finalUrl: 'https://www.amazon.com/final', status: 200 };
+
+  const invoiceCapture = (html: string) =>
+    buildDebugCapture({
+      source: { kind: 'invoice', orderId: '113-1', requestedUrl: 'https://www.amazon.com/inv' },
+      ...response,
+      html,
+    });
+
+  it('cuts HTML one character over the cap down to the cap', () => {
+    const html = 'x'.repeat(DEBUG_HTML_MAX + 1);
+    expect(invoiceCapture(html).html).toBe('x'.repeat(DEBUG_HTML_MAX));
+  });
+
+  it('keeps HTML exactly at the cap unchanged', () => {
+    const html = 'x'.repeat(DEBUG_HTML_MAX);
+    expect(invoiceCapture(html).html).toBe(html);
+  });
+
+  it('keeps short HTML unchanged', () => {
+    expect(invoiceCapture('<p>short</p>').html).toBe('<p>short</p>');
+  });
+
+  it('builds an invoice capture from the order id and requested URL', () => {
+    expect(invoiceCapture('<p>x</p>')).toEqual({
+      orderId: '113-1',
+      requestedUrl: 'https://www.amazon.com/inv',
+      finalUrl: 'https://www.amazon.com/final',
+      status: 200,
+      html: '<p>x</p>',
+    });
+  });
+
+  it('builds the transactions page entry', () => {
+    expect(
+      buildDebugCapture({
+        source: { kind: 'transactions-page' },
+        finalUrl: '',
+        status: 200,
+        html: '<p>none</p>',
+      }),
+    ).toEqual({
+      orderId: '(transactions page)',
+      requestedUrl: TRANSACTIONS_URL,
+      finalUrl: '',
+      status: 200,
+      html: '<p>none</p>',
+    });
+  });
+
+  it('caps the HTML of the transactions page entry', () => {
+    const capture = buildDebugCapture({
+      source: { kind: 'transactions-page' },
+      ...response,
+      html: 'y'.repeat(DEBUG_HTML_MAX + 5),
+    });
+    expect(capture.html.length).toBe(DEBUG_HTML_MAX);
   });
 });

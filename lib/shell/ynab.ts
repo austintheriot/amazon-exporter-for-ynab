@@ -1,5 +1,6 @@
 import { YnabAuthError } from '../core/errors';
 import {
+  buildMemoUpdateBody,
   parseBudgetsResponse,
   parseTransactionsResponse,
   type YnabBudget,
@@ -55,8 +56,6 @@ export async function updateTransactionMemo(
 ): Promise<void> {
   await request(accessToken, `/budgets/${budgetId}/transactions/${transactionId}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      transaction: splits?.length ? { memo, subtransactions: splits } : { memo },
-    }),
+    body: JSON.stringify(buildMemoUpdateBody(memo, splits)),
   });
 }

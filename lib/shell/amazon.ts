@@ -1,7 +1,7 @@
 import { load } from 'cheerio/slim';
 import {
   buildNextPageBody,
-  DEBUG_HTML_MAX,
+  buildDebugCapture,
   isOrderNotFoundPage,
   isSignInPage,
   MAX_TRANSACTION_PAGES,
@@ -102,13 +102,14 @@ export async function fetchAmazonCharges({
       maxPages: MAX_TRANSACTION_PAGES,
     });
     if (decision.kind === 'stop' && decision.reason === 'empty-first-page') {
-      captures.push({
-        orderId: '(transactions page)',
-        requestedUrl: TRANSACTIONS_URL,
-        finalUrl: fetched.finalUrl,
-        status: fetched.status,
-        html: fetched.text.slice(0, DEBUG_HTML_MAX),
-      });
+      captures.push(
+        buildDebugCapture({
+          source: { kind: 'transactions-page' },
+          finalUrl: fetched.finalUrl,
+          status: fetched.status,
+          html: fetched.text,
+        }),
+      );
       break;
     }
     all.push(...parsed.charges);
@@ -136,13 +137,12 @@ async function fetchInvoice(
   const order = isOrderNotFoundPage($) ? null : parseInvoice(page.text, orderId);
   const capture: DebugCapture | null = order
     ? null
-    : {
-        orderId,
-        requestedUrl,
+    : buildDebugCapture({
+        source: { kind: 'invoice', orderId, requestedUrl },
         finalUrl: page.finalUrl,
         status: page.status,
-        html: page.text.slice(0, DEBUG_HTML_MAX),
-      };
+        html: page.text,
+      });
   return { order, capture };
 }
 

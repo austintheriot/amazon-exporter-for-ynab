@@ -59,6 +59,24 @@ export interface DebugCapture {
   html: string;
 }
 
+export type DebugCaptureSource =
+  | { kind: 'transactions-page' }
+  | { kind: 'invoice'; orderId: string; requestedUrl: string };
+
+export function buildDebugCapture(input: {
+  source: DebugCaptureSource;
+  finalUrl: string;
+  status: number;
+  html: string;
+}): DebugCapture {
+  const { source, finalUrl, status, html } = input;
+  const origin =
+    source.kind === 'transactions-page'
+      ? { orderId: '(transactions page)', requestedUrl: TRANSACTIONS_URL }
+      : { orderId: source.orderId, requestedUrl: source.requestedUrl };
+  return { ...origin, finalUrl, status, html: html.slice(0, DEBUG_HTML_MAX) };
+}
+
 const LONG_DATE_PATTERN = /([A-Za-z]+ \d{1,2}, \d{4})/;
 
 function toIsoDate(longDate: string): string | null {
