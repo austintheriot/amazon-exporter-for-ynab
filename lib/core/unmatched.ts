@@ -50,9 +50,9 @@ function closestAmount(
   candidates: MatchCandidate[],
 ): { amount: number; date: string } | null {
   const [best] = [...candidates].sort(
-    (a, b) =>
-      Math.abs(a.amount - want) - Math.abs(b.amount - want) ||
-      daysApart(date, a.date) - daysApart(date, b.date),
+    (left, right) =>
+      Math.abs(left.amount - want) - Math.abs(right.amount - want) ||
+      daysApart(date, left.date) - daysApart(date, right.date),
   );
   return best ? { amount: Math.abs(best.amount) / 1000, date: best.date } : null;
 }
@@ -104,7 +104,7 @@ function explainKind(
     claimedWithoutProposal.set(key, Math.max(0, (claimedWithoutProposal.get(key) ?? 0) - count));
   }
 
-  const sortedEntries = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+  const sortedEntries = [...entries].sort((left, right) => left.date.localeCompare(right.date));
   return sortedEntries.flatMap((entry): UnmatchedEntry[] => {
     const key = keyOf(entry);
     if (take(proposed, key)) return [];

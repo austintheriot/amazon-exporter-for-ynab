@@ -17,14 +17,19 @@ const proposal = (txnId: string): MatchProposal => ({
 describe('selectProposals', () => {
   it('keeps proposal order, not txnIds order', () => {
     const proposals = [proposal('a'), proposal('b'), proposal('c')];
-    expect(selectProposals(proposals, ['c', 'a']).map((selected) => selected.txnId)).toEqual([
+    expect(selectProposals(proposals, ['c', 'a'], []).map((selected) => selected.txnId)).toEqual([
       'a',
       'c',
     ]);
   });
 
+  it('skips ids that are already applied', () => {
+    const proposals = [proposal('a'), proposal('b')];
+    expect(selectProposals(proposals, ['a', 'b'], ['a']).map((selected) => selected.txnId)).toEqual(['b']);
+  });
+
   it('ignores ids with no proposal', () => {
-    expect(selectProposals([proposal('a')], ['z'])).toEqual([]);
+    expect(selectProposals([proposal('a')], ['z'], [])).toEqual([]);
   });
 });
 

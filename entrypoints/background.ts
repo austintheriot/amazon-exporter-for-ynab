@@ -10,6 +10,7 @@ import {
 } from '@/lib/core/copy';
 import { YnabAuthError } from '@/lib/core/errors';
 import { createRunGuard } from '@/lib/core/run-guard';
+import { createSingleFlight } from '@/lib/core/single-flight';
 import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
 import { parseMessage, type SyncState } from '@/lib/core/state';
 import { fetchAmazonCharges, fetchOrderDetails } from '@/lib/shell/amazon';
@@ -26,6 +27,8 @@ import {
 import { getTransactions, updateTransactionMemo } from '@/lib/shell/ynab';
 
 const runGuard = createRunGuard();
+const runFlight = createSingleFlight();
+const connectFlight = createSingleFlight();
 
 function startRun() {
   const run = runGuard.start();
@@ -51,6 +54,9 @@ async function runScan(): Promise<void> {
     proposals: [],
     counts: null,
     debugCaptures: [],
+    scanDebug: null,
+    scanBudgetId: null,
+    scanBudgetName: null,
   });
   try {
     const onProgress = (message: string) => void setState({ message });
@@ -120,7 +126,7 @@ async function runApply(txnIds: string[]): Promise<void> {
     });
     return;
   }
-  const toApply = selectProposals(state.proposals, txnIds);
+  const toApply = selectProposals(state.proposals, txnIds, state.appliedTxnIds);
 
   await setState({ status: 'applying', message: applyStartMessage(toApply.length) });
   const applied: string[] = [...state.appliedTxnIds];
@@ -167,13 +173,13 @@ export default defineBackground(() => {
     if (!message) return false;
     switch (message.type) {
       case 'scan':
-        void runScan();
+        void runFlight.run(runScan);
         break;
       case 'apply':
-        void runApply(message.txnIds);
+        void runFlight.run(() => runApply(message.txnIds));
         break;
       case 'connectYnab':
-        void connectYnab();
+        void connectFlight.run(connectYnab);
         break;
       case 'reset':
         runGuard.cancelAll();

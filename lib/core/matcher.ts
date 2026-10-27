@@ -143,8 +143,8 @@ export function claimMatches(
   const claimed = new Set<string>();
   const matches: { charge: AmazonCharge; candidateId: string }[] = [];
 
-  for (const entry of [...entries].sort((a, b) =>
-    a.date.localeCompare(b.date),
+  for (const entry of [...entries].sort((left, right) =>
+    left.date.localeCompare(right.date),
   )) {
     const wantAmount = sign * Math.round(entry.amount * 1000);
     const found = eligible
@@ -155,9 +155,9 @@ export function claimMatches(
           withinWindow(entry.date, candidate.date, maxDaysAfter),
       )
       .sort(
-        (a, b) =>
-          Math.abs(daysBetween(entry.date, a.date)) -
-          Math.abs(daysBetween(entry.date, b.date)),
+        (left, right) =>
+          Math.abs(daysBetween(entry.date, left.date)) -
+          Math.abs(daysBetween(entry.date, right.date)),
       );
 
     const best = found[0];

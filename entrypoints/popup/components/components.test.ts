@@ -118,4 +118,15 @@ describe('<amex-app>', () => {
     button(app, 'Scan').click();
     expect(msgs).toContainEqual({ type: 'scanPressed' });
   });
+
+  it('the order limit input snaps back to the saved value after a re-render', async () => {
+    const view = scannedView({ settings: { ...readyModel().settings, orderLimit: 200 } });
+    const { app } = await mount(view);
+    const input = app.querySelector('input[type="number"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('no order limit input');
+    input.value = '999';
+    app.view = scannedView({ settings: { ...readyModel().settings, orderLimit: 200 }, orderLimitHint: 'Max 200' });
+    await settle(app);
+    expect(input.value).toBe('200');
+  });
 });

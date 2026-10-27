@@ -1,5 +1,6 @@
 import { html, nothing } from 'lit';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { live } from 'lit/directives/live.js';
 import { YNAB_SIGN_IN_OPEN } from '@/lib/core/copy';
 import type { YnabView } from '@/lib/core/popup/view-model';
 import { LightElement } from './light-element';
@@ -83,7 +84,7 @@ export class AmexSettings extends LightElement {
                 type="number"
                 min="1"
                 max="200"
-                .value=${String(view.orderLimit)}
+                .value=${live(String(view.orderLimit))}
                 aria-describedby=${ifDefined(view.orderLimitHint ? 'limit-hint' : undefined)}
                 @change=${(event: Event) => {
                   emitMsg(this, { type: 'orderLimitEntered', raw: (event.target as HTMLInputElement).value });

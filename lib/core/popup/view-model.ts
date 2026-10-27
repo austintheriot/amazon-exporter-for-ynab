@@ -89,7 +89,7 @@ function yearOptions(model: ReadyModel): YearOption[] {
   const currentYear = Number(model.now.slice(0, 4));
   const saved = model.settings.year;
   const years = Array.from({ length: YEARS_SHOWN }, (_, offset) => currentYear - offset);
-  const withSaved = saved === null || years.includes(saved) ? years : [...years, saved].sort((a, b) => b - a);
+  const withSaved = saved === null || years.includes(saved) ? years : [...years, saved].sort((left, right) => right - left);
   return [
     { value: null, label: 'Recent orders', selected: saved === null },
     ...withSaved.map((year) => ({ value: year, label: String(year), selected: year === saved })),
@@ -139,8 +139,8 @@ function matchRow(proposal: MatchProposal, applied: boolean, checked: boolean): 
 }
 
 function unmatchedRows(model: ReadyModel): UnmatchedRow[] | null {
-  const { scanDebug, proposals } = model.sync;
-  if (!scanDebug) return null;
+  const { scanDebug, proposals, status } = model.sync;
+  if (!scanDebug || status !== 'done') return null;
   return explainUnmatched({ scanDebug, proposals, maxDays: model.settings.maxDays }).map((entry) => ({
     amount: dollars(entry.amount),
     title: `${entry.kind} on ${formatDay(entry.date)}`,

@@ -214,6 +214,15 @@ describe('status and extras', () => {
     ]);
   });
 
+  it.each(['scanning', 'error'] as const)('hides stale unmatched reasons while %s', (status) => {
+    const scanDebug = {
+      charges: [{ orderId: '111-0000000-0000009', date: '2026-10-15', amount: 67.38, paymentMethod: 'Visa' }],
+      credits: [],
+      candidates: [],
+    };
+    expect(scannedView({ sync: scannedSync({ status, scanDebug, proposals: [] }) }).unmatched).toBeNull();
+  });
+
   it('offers the debug download only with debug data', () => {
     expect(view().canExport).toBe(false);
     expect(view({ sync: syncWith({ scanDebug: { charges: [], credits: [], candidates: [] } }) }).canExport).toBe(true);
