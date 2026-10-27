@@ -115,6 +115,19 @@ export default defineConfig(
     },
   },
   {
+    files: ['entrypoints/popup/components/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...['browser', 'chrome', 'fetch', 'localStorage', 'setTimeout', 'setInterval'].map((name) => ({
+          name,
+          message: `${name} is banned in popup components. Components emit msg events; IO lives in lib/shell/popup-services.ts.`,
+        })),
+      ],
+    },
+  },
+  {
     files: ['**/*.test.ts'],
     ...vitest.configs.recommended,
     rules: {
