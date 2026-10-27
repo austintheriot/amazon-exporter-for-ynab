@@ -93,3 +93,4 @@ export function unmatchedReasonText(reason: UnmatchedReason): string {
 export const CONNECT_AMAZON_FIRST = 'Connect Amazon first.';
 export const ORDER_LIMIT_MAX_HINT = 'Max 200';
 export const ORDER_LIMIT_INVALID_HINT = 'Enter a number from 1 to 200';
+export const BUDGETS_FAILED = 'Could not load budgets. Press Disconnect YNAB, then Connect YNAB.';
