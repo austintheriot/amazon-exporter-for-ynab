@@ -14,6 +14,7 @@ import {
   type DebugCapture,
 } from '../core/amazon';
 import { AmazonSessionError } from '../core/errors';
+import { decideAfterPage, finalizeCharges } from '../core/paging';
 
 const FETCH_TIMEOUT_MS = 10_000;
 const DETAIL_CONCURRENCY = 4;
@@ -71,7 +72,7 @@ export async function fetchAmazonCharges({
   const captures: DebugCapture[] = [];
   let postBody: string | null = null;
 
-  for (let page = 1; page <= MAX_TRANSACTION_PAGES; page++) {
+  for (let page = 1; ; page++) {
     onProgress?.(`Fetching Amazon transactions page ${String(page)}…`);
     const fetched = await fetchPage(
       TRANSACTIONS_URL,
@@ -89,7 +90,19 @@ export async function fetchAmazonCharges({
     }
 
     const parsed = parseTransactionsPage($);
-    if (parsed.charges.length === 0 && parsed.credits.length === 0 && page === 1) {
+    const pageDates = [...parsed.charges, ...parsed.credits].map((item) => item.date);
+    const decision = decideAfterPage({
+      page,
+      pageCharges: parsed.charges.length,
+      pageCredits: parsed.credits.length,
+      oldestDateOnPage: pageDates.length === 0 ? null : pageDates.reduce(minDate),
+      chargesSoFar: all.length + parsed.charges.length,
+      sinceDate,
+      limit,
+      nextPageBody: buildNextPageBody($),
+      maxPages: MAX_TRANSACTION_PAGES,
+    });
+    if (decision.kind === 'stop' && decision.reason === 'empty-first-page') {
       captures.push({
         orderId: '(transactions page)',
         requestedUrl: TRANSACTIONS_URL,
@@ -101,21 +114,19 @@ export async function fetchAmazonCharges({
     }
     all.push(...parsed.charges);
     allCredits.push(...parsed.credits);
-
-    const pastCutoff = [...parsed.charges, ...parsed.credits].some(
-      (c) => c.date < sinceDate,
-    );
-    if (pastCutoff || all.length >= limit) break;
-    postBody = buildNextPageBody($);
-    if (!postBody) break;
+    if (decision.kind === 'stop') break;
+    postBody = decision.body;
   }
 
-  const inWindow = (c: AmazonCharge) =>
-    c.date >= sinceDate && (!untilDate || c.date <= untilDate);
-  const charges = all.filter(inWindow).slice(0, limit);
-  const credits = allCredits.filter(inWindow);
+  const { charges, credits } = finalizeCharges(all, allCredits, {
+    sinceDate,
+    untilDate,
+    limit,
+  });
   return { charges, credits, captures };
 }
+
+const minDate = (left: string, right: string) => (right < left ? right : left);
 
 // --- Order invoice (item names for the memo) ---
 
