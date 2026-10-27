@@ -46,7 +46,7 @@ In the popup:
 The extension authenticates with YNAB via the OAuth implicit grant, so it needs a registered OAuth application:
 
 1. Register one at YNAB → Account Settings → Developer Settings → New OAuth Application, with redirect URI `https://obinghobhinimagmkihogflcieggmcgk.chromiumapp.org/`. That URI is stable because the extension ID is pinned by the `key` in `wxt.config.ts` — every unpacked install shares it.
-2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/shell/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
+2. Put the client ID in `YNAB_OAUTH_CLIENT_ID` in `lib/core/oauth.ts`. There is no client secret in the implicit flow, so the ID is safe to commit.
 
 If you fork and change the manifest `key`, your extension ID — and therefore the redirect URI you must register — changes with it. New YNAB OAuth applications start in restricted mode (25 users); see the [YNAB API docs](https://api.ynab.com/) for the review process.
 

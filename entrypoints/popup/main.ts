@@ -4,8 +4,8 @@ import {
   disconnect,
   getAccessToken,
   isConnected,
-  oauthConfigured,
 } from '@/lib/shell/oauth';
+import { oauthConfigured } from '@/lib/core/oauth';
 import type { Settings, SyncState } from '@/lib/core/state';
 import type { YnabBudget } from '@/lib/core/ynab';
 import { getSettings, getState, saveSettings } from '@/lib/shell/storage';

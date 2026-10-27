@@ -1,36 +1,27 @@
+import {
+  YNAB_OAUTH_CLIENT_ID,
+  buildAuthorizeUrl,
+  isTokenUsable,
+  oauthConfigured,
+  parseAuthRedirect,
+  type StoredToken,
+} from '@/lib/core/oauth';
+
 /** YNAB OAuth (implicit grant). Fully client-side: the access token comes
  * back in the redirect fragment and is stored in extension local storage.
  * Tokens expire after ~2 hours; renewal is attempted silently and falls back
  * to an interactive prompt from the popup. */
 
-/** OAuth client ID from app.ynab.com → Account Settings → Developer Settings.
- * The registered redirect URI must match oauthRedirectUri(), which is stable
- * because the extension ID is pinned via the manifest `key`. */
-export const YNAB_OAUTH_CLIENT_ID =
-  'FVvJ6kFZO-Dt-Tg3byToriLOkCWtfTqjQo5w8PnoJpU';
-
-const AUTHORIZE_URL = 'https://app.ynab.com/oauth/authorize';
 const TOKEN_KEY = 'oauthToken';
-/** Renew this long before actual expiry so a token never dies mid-scan */
-const EXPIRY_MARGIN_MS = 5 * 60_000;
-
-interface StoredToken {
-  accessToken: string;
-  expiresAt: number; // epoch ms
-}
 
 export function oauthRedirectUri(): string {
   return browser.identity.getRedirectURL();
 }
 
-export function oauthConfigured(): boolean {
-  return !YNAB_OAUTH_CLIENT_ID.startsWith('REPLACE_');
-}
-
 async function readStored(): Promise<string | null> {
   const stored = await browser.storage.local.get(TOKEN_KEY);
   const token = stored[TOKEN_KEY] as StoredToken | undefined;
-  if (!token || Date.now() >= token.expiresAt - EXPIRY_MARGIN_MS) return null;
+  if (!token || !isTokenUsable(token, Date.now())) return null;
   return token.accessToken;
 }
 
@@ -39,10 +30,7 @@ async function readStored(): Promise<string | null> {
  * any failure — never throws. */
 export async function authorize(interactive: boolean): Promise<string | null> {
   if (!oauthConfigured()) return null;
-  const url =
-    `${AUTHORIZE_URL}?client_id=${encodeURIComponent(YNAB_OAUTH_CLIENT_ID)}` +
-    `&redirect_uri=${encodeURIComponent(oauthRedirectUri())}` +
-    `&response_type=token`;
+  const url = buildAuthorizeUrl(YNAB_OAUTH_CLIENT_ID, oauthRedirectUri());
   let redirect: string | undefined;
   try {
     redirect = await browser.identity.launchWebAuthFlow({ url, interactive });
@@ -50,16 +38,10 @@ export async function authorize(interactive: boolean): Promise<string | null> {
     return null;
   }
   if (!redirect) return null;
-  const params = new URLSearchParams(new URL(redirect).hash.slice(1));
-  const accessToken = params.get('access_token');
-  const expiresIn = Number(params.get('expires_in'));
-  if (!accessToken || !Number.isFinite(expiresIn)) return null;
-  const token: StoredToken = {
-    accessToken,
-    expiresAt: Date.now() + expiresIn * 1000,
-  };
+  const token = parseAuthRedirect(redirect, Date.now());
+  if (!token) return null;
   await browser.storage.local.set({ [TOKEN_KEY]: token });
-  return accessToken;
+  return token.accessToken;
 }
 
 /** Valid stored token, or a silent renewal; null means the user must
