@@ -40,7 +40,10 @@ describe('workflows', () => {
   });
 
   it.each(workflows)('$name runs no verify step on its own', ({ text }) => {
-    expect(linesMatching(text, /run: bun run (lint|test|typecheck|verify)\b/)).toEqual([]);
+    const verifySteps = runBodies(text).filter((body) =>
+      /\bbun run (lint|test|typecheck|verify)\b|\b(vitest|eslint|tsc)\b/.test(body),
+    );
+    expect(verifySteps).toEqual([]);
   });
 
   it.each(workflows)('$name drops credentials after every checkout', ({ text }) => {

@@ -3,7 +3,7 @@
  *   bun scripts/release-check-ci.ts */
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
-import { checkRelease } from './release-check';
+import { checkRelease, pickPreviousTag } from './release-check';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -49,6 +49,11 @@ if (!verdict.ok) {
   process.exit(1);
 }
 
-const previous = git('describe', '--tags', '--abbrev=0', '--match', 'v[0-9]*', `${sha}^`);
-appendFileSync(outputFile, `previous-tag=${previous.ok ? previous.stdout : ''}\n`);
-console.log(`Release ${tag} ok. Notes start after ${previous.ok ? previous.stdout : 'the first commit'}.`);
+const merged = git('tag', '--merged', `${sha}^`, '--sort=-v:refname');
+const previousTag = merged.ok ? pickPreviousTag(merged.stdout.split('\n')) : null;
+appendFileSync(outputFile, `previous-tag=${previousTag ?? ''}\n`);
+if (previousTag === null) {
+  console.log(`::warning::No previous vX.Y.Z tag before ${tag}. Release notes will cover the whole history.`);
+} else {
+  console.log(`Release ${tag} ok. Notes start after ${previousTag}.`);
+}

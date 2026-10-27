@@ -91,10 +91,10 @@
 - [ ] **Step 3: Implement** `checkRelease` (pure, no IO) and the shell entry. Use `Bun.spawnSync` for git. The shell imports nothing outside the Bun standard library, so it runs before `bun install`.
 - [ ] **Step 4: Run** the test file. Expected: PASS.
 - [ ] **Step 5: Rewrite `release.yml`** per Global Constraints:
-  - `build` job, `contents: read`: pinned checkout with `fetch-depth: 0` and `persist-credentials: false`; pinned setup-bun with `no-cache: true`; step `id: check` runs `bun scripts/release-check.ts`; pinned setup-node; `bun install --frozen-lockfile`; `bun run zip`; `git diff --exit-code`; pinned upload-artifact `name: release-zip`, `path: .output/*-chrome.zip`, `if-no-files-found: error`, `retention-days: 7`. Job output `previous-tag: ${{ steps.check.outputs.previous-tag }}`.
+  - `build` job, `contents: read`: pinned checkout with `fetch-depth: 0` and `persist-credentials: false`; pinned setup-bun with `no-cache: true`; step `id: check` runs `bun scripts/release-check-ci.ts`; pinned setup-node; `bun install --frozen-lockfile`; `bun run zip`; `git diff --exit-code`; pinned upload-artifact `name: release-zip`, `path: .output/*-chrome.zip`, `if-no-files-found: error`, `retention-days: 7`. Job output `previous-tag: ${{ steps.check.outputs.previous-tag }}`.
   - `publish` job, `needs: build`, `environment: release`: pinned download-artifact into `dist`; `sha256sum -- *-chrome.zip > SHA256SUMS` in `dist`; pinned attest-build-provenance with `subject-path: dist/*-chrome.zip`; `gh release create "$GITHUB_REF_NAME" dist/*-chrome.zip dist/SHA256SUMS --title "$GITHUB_REF_NAME" --generate-notes --verify-tag`, adding `--notes-start-tag "$PREVIOUS_TAG"` only when `PREVIOUS_TAG` is non-empty (bash array). `env:` holds `GH_TOKEN: ${{ github.token }}`, `GH_REPO: ${{ github.repository }}`, `PREVIOUS_TAG: ${{ needs.build.outputs.previous-tag }}`.
 - [ ] **Step 6: Run** `bun run verify` and actionlint over both workflows. Expected: all tests pass including every `workflows.test.ts` row; actionlint reports nothing.
-- [ ] **Step 7: Local dry run of the shell** on a throwaway local tag: `git tag v9.9.9 && GITHUB_REF_NAME=v9.9.9 GITHUB_SHA=$(git rev-parse HEAD) GITHUB_OUTPUT=/dev/stdout bun scripts/release-check.ts; git tag -d v9.9.9`. Expected: exit 1, error naming `v9.9.9` and `0.1.1`. Never push this tag.
+- [ ] **Step 7: Local dry run of the shell** on a throwaway local tag: `git tag v9.9.9 && GITHUB_REF_NAME=v9.9.9 GITHUB_SHA=$(git rev-parse HEAD) GITHUB_OUTPUT=/dev/stdout bun scripts/release-check-ci.ts; git tag -d v9.9.9`. Expected: exit 1, error naming `v9.9.9` and `0.1.1`. Never push this tag.
 - [ ] **Step 8: Commit** Task 1 and Task 2 files together: `ci: split release into read-only build and gated publish; preflight tag checks`.
 
 ### Task 3: Own extension ID and YNAB OAuth client
@@ -116,7 +116,7 @@
 **Files:**
 - Modify: `package.json` (`"version"`), `README.md` (Install section)
 
-- [ ] **Step 1: Run** `GITHUB_REF_NAME=v0.2.0 ... bun scripts/release-check.ts` as in Task 2 Step 7 with a local tag `v0.2.0`, then delete the tag. Expected: FAIL naming `0.1.1`.
+- [ ] **Step 1: Run** `GITHUB_REF_NAME=v0.2.0 ... bun scripts/release-check-ci.ts` as in Task 2 Step 7 with a local tag `v0.2.0`, then delete the tag. Expected: FAIL naming `0.1.1`.
 - [ ] **Step 2: Set** `"version": "0.2.0"`.
 - [ ] **Step 3: Rerun** Step 1. Expected: the version error is gone. The ancestry check fails because the commit is not yet on `origin/main`; that is correct.
 - [ ] **Step 4: README Install:** replace the "no release builds" paragraph with: download the latest `-chrome.zip` from `https://github.com/austintheriot/amazon-exporter-for-ynab/releases`, check it with `gh attestation verify <zip> --repo austintheriot/amazon-exporter-for-ynab` or against `SHA256SUMS`, then load unpacked. Keep build-from-source below it. In the "Releases" paragraph, say a `vX.Y.Z` tag on a `main` commit whose `package.json` version matches builds the zip, and an owner approval in the `release` environment publishes it.
@@ -133,6 +133,6 @@
 ### Task 6: First release
 
 - [ ] **Step 1: Ask the owner** for the go to push `v0.2.0`.
-- [ ] **Step 2: Run** `git tag v0.2.0 && git push origin v0.2.0`. Use `/monitor-ci` on the Release run. Expected: `build` green, `publish` waiting for approval.
+- [ ] **Step 2: Run** `git tag v0.2.0 && git push --atomic origin main v0.2.0`. Use `/monitor-ci` on the Release run. Expected: `build` green, `publish` waiting for approval.
 - [ ] **Step 3: Owner approves** in the Actions UI.
 - [ ] **Step 4: Check** `gh release view v0.2.0 -R austintheriot/amazon-exporter-for-ynab`. Expected: assets `amazon-exporter-for-ynab-0.2.0-chrome.zip` and `SHA256SUMS`; notes list only fork commits after `v0.1.1`. Download the zip and run `gh attestation verify` on it. Expected: verified.

@@ -26,3 +26,8 @@ export function checkRelease({ tag, packageVersion, tagOnMain }: ReleaseFacts): 
   }
   return { ok: true };
 }
+
+/** Candidates come newest first, from `git tag --merged <parent> --sort=-v:refname`. */
+export function pickPreviousTag(candidates: readonly string[]): string | null {
+  return candidates.find((tag) => VERSION_TAG.test(tag)) ?? null;
+}

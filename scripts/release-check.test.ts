@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkRelease, type ReleaseFacts } from './release-check';
+import { checkRelease, pickPreviousTag, type ReleaseFacts } from './release-check';
 
 function facts(overrides: Partial<ReleaseFacts> = {}): ReleaseFacts {
   return { tag: 'v0.2.0', packageVersion: '0.2.0', tagOnMain: true, ...overrides };
@@ -28,5 +28,16 @@ describe('checkRelease', () => {
 
   it.each(['v0.2.0-rc1', 'vtest', '0.2.0', 'v0.2'])('rejects a tag that is not vX.Y.Z: %s', (tag) => {
     expect(checkRelease(facts({ tag })).ok).toBe(false);
+  });
+});
+
+describe('pickPreviousTag', () => {
+  it('returns the first strict version tag from newest-first candidates', () => {
+    expect(pickPreviousTag(['v0.2.0-rc1', 'v1foo', 'v0.1.1', 'v0.1.0'])).toBe('v0.1.1');
+  });
+
+  it('returns null when no candidate is a strict version tag', () => {
+    expect(pickPreviousTag(['v0.2.0-rc1', 'latest'])).toBeNull();
+    expect(pickPreviousTag([])).toBeNull();
   });
 });
