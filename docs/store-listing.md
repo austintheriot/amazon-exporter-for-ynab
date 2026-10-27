@@ -41,7 +41,7 @@ Enrich the user's YNAB transactions with details from the user's own Amazon orde
 
 ## Publishing checklist
 
-1. `npm run zip:store` (builds without the manifest `key`; the store assigns its own extension ID).
+1. `bun run zip:store` (builds without the manifest `key`; the store assigns its own extension ID).
 2. Upload the zip at https://chrome.google.com/webstore/devconsole, fill this listing, submit for review.
 3. Note the store-assigned extension ID and add `https://<store-extension-id>.chromiumapp.org/` as a second redirect URI on the YNAB OAuth application (app.ynab.com → Account Settings → Developer Settings).
 4. Request YNAB app review to lift the 25-user restricted mode before promoting the listing.

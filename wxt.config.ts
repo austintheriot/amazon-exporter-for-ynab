@@ -20,7 +20,7 @@ export default defineConfig({
     ],
     // Pins the extension ID (obinghobhinimagmkihogflcieggmcgk) so every
     // unpacked install shares one OAuth redirect URI. Store builds
-    // (STORE_BUILD=1, `npm run zip:store`) omit it: the Chrome Web Store
+    // (STORE_BUILD=1, `bun run zip:store`) omit it: the Chrome Web Store
     // rejects manifests containing `key` and assigns its own extension ID,
     // whose redirect URI must also be registered with the YNAB OAuth app.
     ...(process.env['STORE_BUILD']
