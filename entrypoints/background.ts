@@ -37,7 +37,7 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-async function runScan(): Promise<void> {
+export async function runScan(): Promise<void> {
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken || !settings.budgetId) {
@@ -177,7 +177,7 @@ async function runScan(): Promise<void> {
   }
 }
 
-async function runApply(txnIds: string[]): Promise<void> {
+export async function runApply(txnIds: string[]): Promise<void> {
   const settings = await getSettings();
   const accessToken = await getAccessToken();
   if (!accessToken) {
