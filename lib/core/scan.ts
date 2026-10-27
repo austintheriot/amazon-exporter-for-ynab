@@ -9,6 +9,7 @@ import {
   matchRefunds,
   type ChargeMatch,
 } from './matcher';
+import { scanSummary } from './copy';
 import type { MatchProposal } from './proposal';
 import type { ScanDebug, Settings } from './state';
 import type { YnabTransaction } from './ynab';
@@ -161,7 +162,7 @@ export function buildScanResult(input: {
       digitalSkipped: matches.digitalSkipped,
       invoicesUnparsed: matches.charges.length + matches.refunds.length - proposals.length,
     },
-    message: `Found ${String(chargeCount)} charges, matched ${String(proposals.length)} transactions.`,
+    message: scanSummary(chargeCount, matches.scanDebug.credits.length, proposals.length),
     debugCaptures: captures.slice(0, MAX_DEBUG_CAPTURES),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyStartMessage, applySummary, selectProposals } from './apply';
+import { selectProposals } from './apply';
 import type { MatchProposal } from './proposal';
 
 const proposal = (txnId: string): MatchProposal => ({
@@ -25,21 +25,5 @@ describe('selectProposals', () => {
 
   it('ignores ids with no proposal', () => {
     expect(selectProposals([proposal('a')], ['z'])).toEqual([]);
-  });
-});
-
-describe('applyStartMessage', () => {
-  it('names the count', () => {
-    expect(applyStartMessage(3)).toBe('Writing 3 memos…');
-  });
-});
-
-describe('applySummary', () => {
-  it('reports success without failures', () => {
-    expect(applySummary(4, 0)).toBe('Applied 4 memos.');
-  });
-
-  it('reports successes and failures', () => {
-    expect(applySummary(4, 1)).toBe('Applied 3 memos, 1 failed.');
   });
 });

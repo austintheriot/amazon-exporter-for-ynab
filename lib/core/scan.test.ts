@@ -208,7 +208,7 @@ describe('buildScanResult', () => {
   });
 
   it('writes the done message', () => {
-    expect(result.message).toBe('Found 3 charges, matched 4 transactions.');
+    expect(result.message).toBe('Found 3 charges and 2 refunds. 4 matches ready to write.');
   });
 
   it('caps debug captures at 3 in input order', () => {

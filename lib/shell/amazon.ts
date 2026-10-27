@@ -13,6 +13,7 @@ import {
   type AmazonOrder,
   type DebugCapture,
 } from '../core/amazon';
+import { countOf } from '../core/copy';
 import { AmazonSessionError } from '../core/errors';
 import { decideAfterPage, finalizeCharges, oldestDate } from '../core/paging';
 
@@ -73,7 +74,7 @@ export async function fetchAmazonCharges({
   let postBody: string | null = null;
 
   for (let page = 1; ; page++) {
-    onProgress?.(`Fetching Amazon transactions page ${String(page)}…`);
+    onProgress?.(`Reading Amazon charges, page ${String(page)}…`);
     const fetched = await fetchPage(
       TRANSACTIONS_URL,
       postBody === null
@@ -173,7 +174,7 @@ export async function fetchOrderDetails(
   onProgress?: (message: string) => void,
 ): Promise<{ orders: Map<string, AmazonOrder>; captures: DebugCapture[] }> {
   const unique = [...new Set(orderIds)];
-  onProgress?.(`Fetching ${String(unique.length)} order invoices…`);
+  onProgress?.(`Reading ${countOf(unique.length, 'Amazon order', 'Amazon orders')}…`);
   const results = await mapWithConcurrency(unique, DETAIL_CONCURRENCY, (id) =>
     fetchInvoice(id).catch(() => ({ order: null, capture: null })),
   );

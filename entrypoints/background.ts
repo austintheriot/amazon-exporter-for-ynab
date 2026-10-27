@@ -1,10 +1,12 @@
-import { applyStartMessage, applySummary, selectProposals } from '@/lib/core/apply';
+import { selectProposals } from '@/lib/core/apply';
 import {
+  applyStartMessage,
+  applySummary,
   errorMessage,
   missingSetupMessage,
   RECONNECT_MESSAGE,
-  YnabAuthError,
-} from '@/lib/core/errors';
+} from '@/lib/core/copy';
+import { YnabAuthError } from '@/lib/core/errors';
 import { createRunGuard } from '@/lib/core/run-guard';
 import { buildScanResult, matchScan, scanWindow } from '@/lib/core/scan';
 import { parseMessage, type SyncState } from '@/lib/core/state';
@@ -50,7 +52,7 @@ async function runScan(): Promise<void> {
       onProgress,
     });
 
-    await setState({ message: 'Fetching YNAB transactions…' });
+    await setState({ message: 'Reading YNAB transactions…' });
     const transactions = await getTransactions(accessToken, settings.budgetId, ynabSinceDate);
 
     const matches = matchScan({ charges, credits, transactions, maxDays: settings.maxDays });
@@ -76,6 +78,7 @@ async function runScan(): Promise<void> {
       lastScanAt: now,
     });
   } catch (err) {
+    console.error('Scan failed', err);
     if (err instanceof YnabAuthError) await disconnect();
     await setState({ status: 'error', message: errorMessage(err) });
   }
