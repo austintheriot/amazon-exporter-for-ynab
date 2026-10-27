@@ -98,51 +98,92 @@ function daysBetween(a: string, b: string): number {
   return (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
 }
 
+export interface MatchCandidate {
+  id: string;
+  date: string;
+  amount: number;
+  payee: string;
+  hasMemo: boolean;
+}
+
+export function toMatchCandidate(transaction: YnabTransaction): MatchCandidate {
+  return {
+    id: transaction.id,
+    date: transaction.date,
+    amount: transaction.amount,
+    payee: transaction.payee_name ?? '',
+    hasMemo: !!transaction.memo?.trim(),
+  };
+}
+
+export function isEligible(candidate: MatchCandidate, sign: -1 | 1): boolean {
+  return (
+    Math.sign(candidate.amount) === sign && isAmazonPayee(candidate.payee) && !candidate.hasMemo
+  );
+}
+
+export function withinWindow(entryDate: string, candidateDate: string, maxDaysAfter: number): boolean {
+  const diff = daysBetween(entryDate, candidateDate);
+  return diff >= -1 && diff <= maxDaysAfter;
+}
+
 /**
  * One-to-one matching of Amazon amounts to YNAB transactions by exact amount
  * within a date window. Transactions that already have a memo are left
  * alone. Ambiguity resolves to the closest date; each transaction is claimed
  * once. `sign` selects outflows (-1, charges) or inflows (1, refunds).
  */
-function matchByAmount(
+export function claimMatches(
   entries: AmazonCharge[],
-  transactions: YnabTransaction[],
+  candidates: MatchCandidate[],
   maxDaysAfter: number,
   sign: -1 | 1,
-): ChargeMatch[] {
-  const candidates = transactions.filter(
-    (t) =>
-      Math.sign(t.amount) === sign &&
-      isAmazonPayee(t.payee_name) &&
-      !t.memo?.trim(),
-  );
-
+): { charge: AmazonCharge; candidateId: string }[] {
+  const eligible = candidates.filter((candidate) => isEligible(candidate, sign));
   const claimed = new Set<string>();
-  const matches: ChargeMatch[] = [];
+  const matches: { charge: AmazonCharge; candidateId: string }[] = [];
 
   for (const entry of [...entries].sort((a, b) =>
     a.date.localeCompare(b.date),
   )) {
     const wantAmount = sign * Math.round(entry.amount * 1000);
-    const found = candidates
-      .filter((t) => {
-        if (claimed.has(t.id) || t.amount !== wantAmount) return false;
-        const diff = daysBetween(entry.date, t.date);
-        return diff >= -1 && diff <= maxDaysAfter;
-      })
+    const found = eligible
+      .filter(
+        (candidate) =>
+          !claimed.has(candidate.id) &&
+          candidate.amount === wantAmount &&
+          withinWindow(entry.date, candidate.date, maxDaysAfter),
+      )
       .sort(
         (a, b) =>
           Math.abs(daysBetween(entry.date, a.date)) -
           Math.abs(daysBetween(entry.date, b.date)),
       );
 
-    const txn = found[0];
-    if (!txn) continue;
-    claimed.add(txn.id);
-    matches.push({ charge: entry, txn });
+    const best = found[0];
+    if (!best) continue;
+    claimed.add(best.id);
+    matches.push({ charge: entry, candidateId: best.id });
   }
 
   return matches;
+}
+
+function matchByAmount(
+  entries: AmazonCharge[],
+  transactions: YnabTransaction[],
+  maxDaysAfter: number,
+  sign: -1 | 1,
+): ChargeMatch[] {
+  const byId = new Map(
+    [...transactions].reverse().map((transaction) => [transaction.id, transaction]),
+  );
+  return claimMatches(entries, transactions.map(toMatchCandidate), maxDaysAfter, sign).flatMap(
+    ({ charge, candidateId }) => {
+      const txn = byId.get(candidateId);
+      return txn ? [{ charge, txn }] : [];
+    },
+  );
 }
 
 export function matchCharges(

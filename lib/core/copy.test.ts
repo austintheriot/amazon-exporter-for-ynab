@@ -14,6 +14,7 @@ import {
   RESET_LABEL_BUSY,
   RESET_LABEL_IDLE,
   scanSummary,
+  unmatchedReasonText,
   YNAB_SIGN_IN_FAILED,
   YNAB_SIGN_IN_OPEN,
 } from './copy';
@@ -139,5 +140,38 @@ describe('setup copy', () => {
       'YNAB sign-in was cancelled or failed. Nothing was changed. Press Connect YNAB to try again.',
     );
     expect(YNAB_SIGN_IN_OPEN).toBe('Sign-in window is open.');
+  });
+});
+
+describe('unmatchedReasonText', () => {
+  it('explains each reason', () => {
+    expect(unmatchedReasonText({ kind: 'digital' })).toBe('Digital order, skipped.');
+    expect(unmatchedReasonText({ kind: 'order-unreadable' })).toBe(
+      'Matched, but the order page could not be read. Download the debug file.',
+    );
+    expect(unmatchedReasonText({ kind: 'already-has-memo' })).toBe(
+      'The matching YNAB transaction already has a memo.',
+    );
+    expect(unmatchedReasonText({ kind: 'taken' })).toBe(
+      'Another charge or refund with the same amount took the only matching YNAB transaction.',
+    );
+  });
+
+  it('says how far away an out-of-window match is', () => {
+    expect(unmatchedReasonText({ kind: 'outside-window', daysAway: 10, maxDays: 7 })).toBe(
+      'A YNAB transaction has this amount, but its date is 10 days away (limit: 7).',
+    );
+    expect(unmatchedReasonText({ kind: 'outside-window', daysAway: 1, maxDays: 0 })).toBe(
+      'A YNAB transaction has this amount, but its date is 1 day away (limit: 0).',
+    );
+  });
+
+  it('names the closest amount', () => {
+    expect(
+      unmatchedReasonText({ kind: 'no-amount-match', closest: { amount: 67.39, date: '2026-06-11' } }),
+    ).toBe('No Amazon YNAB transaction for this amount. Closest: $67.39 on 2026-06-11.');
+    expect(unmatchedReasonText({ kind: 'no-amount-match', closest: null })).toBe(
+      'No Amazon YNAB transaction for this amount.',
+    );
   });
 });

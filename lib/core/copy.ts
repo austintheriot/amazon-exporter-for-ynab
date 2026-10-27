@@ -1,5 +1,6 @@
 import type { ScanCounts } from './amazon';
 import { AmazonSessionError, YnabAuthError } from './errors';
+import type { UnmatchedReason } from './unmatched';
 
 const pluralRules = new Intl.PluralRules('en-US');
 
@@ -64,4 +65,27 @@ export function countsLine(counts: ScanCounts): string {
     parts.push(`${countOf(counts.invoicesUnparsed, 'order', 'orders')} could not be read`);
   }
   return parts.join(' · ');
+}
+
+export function dollars(amount: number): string {
+  return `$${amount.toFixed(2)}`;
+}
+
+export function unmatchedReasonText(reason: UnmatchedReason): string {
+  switch (reason.kind) {
+    case 'digital':
+      return 'Digital order, skipped.';
+    case 'order-unreadable':
+      return 'Matched, but the order page could not be read. Download the debug file.';
+    case 'already-has-memo':
+      return 'The matching YNAB transaction already has a memo.';
+    case 'taken':
+      return 'Another charge or refund with the same amount took the only matching YNAB transaction.';
+    case 'outside-window':
+      return `A YNAB transaction has this amount, but its date is ${countOf(reason.daysAway, 'day', 'days')} away (limit: ${String(reason.maxDays)}).`;
+    case 'no-amount-match':
+      return reason.closest
+        ? `No Amazon YNAB transaction for this amount. Closest: ${dollars(reason.closest.amount)} on ${reason.closest.date}.`
+        : 'No Amazon YNAB transaction for this amount.';
+  }
 }
