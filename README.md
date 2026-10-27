@@ -75,6 +75,7 @@ Install [Bun](https://bun.sh) first. The scripts run WXT, Vitest, and `tsc` on N
 - `bun run test`: Vitest suite (`lib/core` unit and property tests, popup runtime and component tests)
 - `bun run lint`: ESLint, including the rules that keep `lib/core` free of IO
 - `bun run typecheck`: TypeScript, strict mode
+- `bun run verify`: typecheck, lint, and test in that order. `build`, `zip`, and `zip:store` run it first and stop on the first failure.
 - `bun run zip`: build and zip the extension
 - `bun scripts/parse-captures.ts <debug.json>`: run the invoice parser against real captured pages from the popup's debug export
 

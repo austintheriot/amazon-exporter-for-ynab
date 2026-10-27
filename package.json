@@ -12,9 +12,10 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "build": "wxt build",
-    "zip": "wxt zip",
-    "zip:store": "STORE_BUILD=1 wxt zip",
+    "verify": "bun run typecheck && bun run lint && bun run test",
+    "build": "bun run verify && wxt build",
+    "zip": "bun run verify && wxt zip",
+    "zip:store": "bun run verify && STORE_BUILD=1 wxt zip",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
