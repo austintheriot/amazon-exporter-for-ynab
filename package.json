@@ -35,5 +35,20 @@
     "vitest": "4.1.11",
     "wxt": "^0.21.4"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.2",
+  "overrides": {
+    "@typescript-eslint/eslint-plugin": {
+      ".": "8.71.2",
+      "ignore": "7.0.12"
+    },
+    "@typescript-eslint/parser": "8.71.2",
+    "@typescript-eslint/project-service": "8.71.2",
+    "@typescript-eslint/scope-manager": "8.71.2",
+    "@typescript-eslint/tsconfig-utils": "8.71.2",
+    "@typescript-eslint/type-utils": "8.71.2",
+    "@typescript-eslint/types": "8.71.2",
+    "@typescript-eslint/typescript-estree": "8.71.2",
+    "@typescript-eslint/utils": "8.71.2",
+    "@typescript-eslint/visitor-keys": "8.71.2"
+  }
 }

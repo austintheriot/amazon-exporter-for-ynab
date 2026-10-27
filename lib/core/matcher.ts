@@ -92,9 +92,9 @@ export function buildSplits(
   const pricedItems = order.items.filter(hasPrice);
   if (pricedItems.length !== order.items.length) return null;
 
-  const splits: YnabSplit[] = pricedItems.map((i) => ({
-    amount: dollarsToOutflowMilliunits(i.price),
-    memo: i.name.length > MEMO_MAX_LENGTH ? i.name.slice(0, MEMO_MAX_LENGTH) : i.name,
+  const splits: YnabSplit[] = pricedItems.map((item) => ({
+    amount: dollarsToOutflowMilliunits(item.price),
+    memo: item.name.length > MEMO_MAX_LENGTH ? item.name.slice(0, MEMO_MAX_LENGTH) : item.name,
   }));
   const remainder =
     dollarsToOutflowMilliunits(chargeAmount) -

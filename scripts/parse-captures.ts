@@ -20,7 +20,7 @@ for (const c of captures) {
   if (order) {
     console.log(
       `ok   ${c.orderId}: ${order.date} $${String(order.total)} — ${order.items
-        .map((i) => `${i.name.slice(0, 50)}${i.price !== null ? ` ($${String(i.price)})` : ''}`)
+        .map((item) => `${item.name.slice(0, 50)}${item.price !== null ? ` ($${String(item.price)})` : ''}`)
         .join(' | ')}`,
     );
   } else {
