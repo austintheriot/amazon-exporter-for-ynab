@@ -103,14 +103,16 @@ const nextDataSchema = z.object({
 });
 
 const transactionRowSchema = z.object({
-  formattedAmount: z.optional(z.string()),
-  formattedDate: z.optional(z.string()),
-  orderData: z.optional(z.array(z.object({ orderDisplayString: z.optional(z.string()) }))),
-  statusInfo: z.optional(z.object({ amountDetailsStatusType: z.optional(z.string()) })),
-  paymentMethodDisplayStringData: z.optional(
+  formattedAmount: z.nullish(z.string()),
+  formattedDate: z.nullish(z.string()),
+  orderData: z.nullish(
+    z.array(z.nullish(z.object({ orderDisplayString: z.nullish(z.string()) }))),
+  ),
+  statusInfo: z.nullish(z.object({ amountDetailsStatusType: z.nullish(z.string()) })),
+  paymentMethodDisplayStringData: z.nullish(
     z.object({
-      paymentMethodName: z.optional(z.string()),
-      paymentMethodNumber: z.optional(z.object({ lastDigits: z.optional(z.string()) })),
+      paymentMethodName: z.nullish(z.string()),
+      paymentMethodNumber: z.nullish(z.object({ lastDigits: z.nullish(z.string()) })),
     }),
   ),
 });

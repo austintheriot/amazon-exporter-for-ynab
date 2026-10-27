@@ -15,9 +15,9 @@ const transactionSchema = z.object({
   date: z.string(),
   /** Milliunits, outflow negative */
   amount: z.number(),
-  payee_name: z.nullable(z.string()),
-  memo: z.nullable(z.string()),
-  category_name: z.nullable(z.string()),
+  payee_name: z.nullish(z.string()),
+  memo: z.nullish(z.string()),
+  category_name: z.nullish(z.string()),
   /** Present on split transactions; splits cannot be updated again */
   subtransactions: z.optional(z.array(z.object({ id: z.string() }))),
 });

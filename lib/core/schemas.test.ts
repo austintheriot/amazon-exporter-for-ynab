@@ -1,7 +1,9 @@
 import { load } from 'cheerio/slim';
 import { describe, expect, it } from 'vitest';
 import { invoiceCapturesSchema, parseTransactionsPage } from './amazon';
+import { matchCharges } from './matcher';
 import { parseStoredToken } from './oauth';
+import { matchScan } from './scan';
 import {
   DEFAULT_SETTINGS,
   DEFAULT_STATE,
@@ -109,6 +111,26 @@ describe('parseTransactionsResponse', () => {
         category_name: null,
       },
     ]);
+  });
+
+  it('accepts a transaction without memo, payee_name, and category_name', () => {
+    const [transaction] = parseTransactionsResponse({
+      data: { transactions: [{ id: 't-1', date: '2026-06-28', amount: -10_000 }] },
+    });
+    expect(transaction).toEqual({ id: 't-1', date: '2026-06-28', amount: -10_000 });
+    expect(transaction).toBeDefined();
+    const transactions = transaction ? [transaction] : [];
+    const charge = {
+      orderId: '113-1111111-1111111',
+      date: '2026-06-28',
+      amount: 10,
+      paymentMethod: '',
+    };
+    expect(matchCharges([charge], transactions)).toEqual([]);
+    expect(
+      matchScan({ charges: [charge], credits: [], transactions, maxDays: 7 }).scanDebug
+        .candidates,
+    ).toEqual([]);
   });
 
   it('throws at the path of a string amount', () => {
@@ -372,6 +394,70 @@ describe('parseTransactionsPage (__NEXT_DATA__ rows)', () => {
           paymentMethod: 'Prime Visa ****1234',
         },
       ],
+      credits: [],
+    });
+  });
+
+  it('keeps a charge row whose optional fields are null', () => {
+    const row = {
+      ...nextDataRow('-$10.00', '113-1111111-1111111'),
+      statusInfo: null,
+      paymentMethodDisplayStringData: null,
+    };
+    expect(parseTransactionsPage(load(nextDataPage([row])))).toEqual({
+      charges: [
+        {
+          orderId: '113-1111111-1111111',
+          date: '2026-06-28',
+          amount: 10,
+          paymentMethod: '',
+        },
+      ],
+      credits: [],
+    });
+  });
+
+  it('keeps a refund row as a credit when its payment method is null', () => {
+    const row = {
+      ...nextDataRow('$12.50', '113-3333333-3333333'),
+      statusInfo: { amountDetailsStatusType: 'Refund' },
+      paymentMethodDisplayStringData: null,
+    };
+    expect(parseTransactionsPage(load(nextDataPage([row])))).toEqual({
+      charges: [],
+      credits: [
+        {
+          orderId: '113-3333333-3333333',
+          date: '2026-06-28',
+          amount: 12.5,
+          paymentMethod: '',
+        },
+      ],
+    });
+  });
+
+  it('keeps a row whose nested payment fields are null', () => {
+    const row = {
+      ...nextDataRow('-$10.00', '113-1111111-1111111'),
+      paymentMethodDisplayStringData: {
+        paymentMethodName: null,
+        paymentMethodNumber: { lastDigits: '1234' },
+      },
+    };
+    expect(parseTransactionsPage(load(nextDataPage([row]))).charges).toEqual([
+      {
+        orderId: '113-1111111-1111111',
+        date: '2026-06-28',
+        amount: 10,
+        paymentMethod: 'Card ****1234',
+      },
+    ]);
+  });
+
+  it('skips a row whose formattedDate is null', () => {
+    const row = { ...nextDataRow('-$10.00', '113-1111111-1111111'), formattedDate: null };
+    expect(parseTransactionsPage(load(nextDataPage([row])))).toEqual({
+      charges: [],
       credits: [],
     });
   });
