@@ -4,7 +4,7 @@ import { z } from 'zod/mini';
  * The registered redirect URI must match oauthRedirectUri(), which is stable
  * because the extension ID is pinned via the manifest `key`. */
 export const YNAB_OAUTH_CLIENT_ID =
-  'FVvJ6kFZO-Dt-Tg3byToriLOkCWtfTqjQo5w8PnoJpU';
+  'FmXEqv61VbNuTGAw4v4ZMKZSwf9A9uJEw5i2gKVaPjI';
 
 const AUTHORIZE_URL = 'https://app.ynab.com/oauth/authorize';
 

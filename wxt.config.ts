@@ -18,7 +18,7 @@ export default defineConfig({
       'https://www.amazon.com/*',
       'https://amazon.com/*',
     ],
-    // Pins the extension ID (obinghobhinimagmkihogflcieggmcgk) so every
+    // Pins the extension ID (dfnmlcjhckaldmfigjhjomddnffjiljc) so every
     // unpacked install shares one OAuth redirect URI. Store builds
     // (STORE_BUILD=1, `bun run zip:store`) omit it: the Chrome Web Store
     // rejects manifests containing `key` and assigns its own extension ID,
@@ -26,7 +26,7 @@ export default defineConfig({
     ...(process.env['STORE_BUILD']
       ? {}
       : {
-          key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApnncYs79+1fEXAk+xjYGMxFeMenwalb0C8DeejpnTYYQ2v2qXRqCjdYpy5wZrMpWgE9iItcsWMRj3PBs28q4vYlKduZ/o8K1SHEZN7i1gx6LUuVXhsNGbQgUbatjqQR5SojokW0YVtStoi3lwRvYVEDfyxyX2qpluBcBm/3kNGVVt8lB+eCtk4J7z8leVqYQityGPvsvBZFPIwk2mRmuEJZ5e5+tvVYsZccDpqSqI+NtDiSx3OIJBjQGcYC4bzA8IrCm3t557aNGyY/0nQcJLjlfBV9uzC1fvYkQi8lTl0hPXDE/8jkjowae/A6QGZ88rqMAtPtP92nLuiP6akfEcwIDAQAB',
+          key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx6yVbtJblq8cUr2b8k9s3l2SRX2OVU6bKZPUYMZ2cnj/YGywKlqTEI+Zl5/caGLSo9VbbOeH+ncF2yqjPjohmUO7+Ur3f3Ocj0GCvscMganxc0MdAbwQgeqdrB9oArDsioz/S1xHk91BiDnMjjazdYywAM2kGIyAdFsJd4oLyrkf32gwQvpv6Q9O1WUcbm5RTQnjZILgN2rSxeSU9eDn6NuZ8Hb0Qb9nWMAXFqyB44AXy9xw48cB62IHWqVRfMGwCueq1WSMFxDOlMSl0Pl2QixHequJ4B5qCr+5VG9UEdSWJG4Fi/ZCuU+v6GXFOQpbR+jCDF3PqGeYmHH94P6PCQIDAQAB',
         }),
   },
 });
