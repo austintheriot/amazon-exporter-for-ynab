@@ -52,6 +52,16 @@ describe('workflows', () => {
     expect(dropped).toBe(checkouts);
   });
 
+  it.each(workflows)('$name uploads no artifact from a hidden path', ({ text }) => {
+    const lines = text.split('\n');
+    const hiddenUploads = lines
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => line.includes('uses: actions/upload-artifact@'))
+      .flatMap(({ index }) => lines.slice(index + 1, index + 8))
+      .filter((line) => /^\s*path:\s*\.[^/]/.test(line));
+    expect(hiddenUploads).toEqual([]);
+  });
+
   it.each(workflows)('$name interpolates no expression inside a run body', ({ text }) => {
     expect(runBodies(text).filter((body) => body.includes('${{'))).toEqual([]);
   });
